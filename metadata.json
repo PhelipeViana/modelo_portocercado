@@ -1,0 +1,7 @@
+{
+  "name": "Associação Porto Cercado",
+  "description": "Portal Oficial e Ficha de Filiação da Associação dos Ribeirinhos do Porto Cercado - Pantanal Verde.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
