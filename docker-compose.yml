@@ -1,32 +1,85 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: portocercado2_postgres
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${DB_USER:-portocercado2}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-portocercado2_pass}
+      - POSTGRES_DB=${DB_NAME:-portocercado2_db}
+    volumes:
+      - portocercado2_postgres_data:/var/lib/postgresql/data
+    networks:
+      - portocercado2_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-portocercado2} -d ${DB_NAME:-portocercado2_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: portocercado2_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - portocercado2_redis_data:/data
+    networks:
+      - portocercado2_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: porto_cercado_backend
+    container_name: portocercado2_backend
     ports:
       - "8088:8080"
     environment:
       - PORT=8080
-      - ENV=development
+      - ENV=${ENV:-development}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-portocercado2}
+      - DB_PASSWORD=${DB_PASSWORD:-portocercado2_pass}
+      - DB_NAME=${DB_NAME:-portocercado2_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-portocercado2_super_secret_key_2026}
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
-      - porto_network
+      - portocercado2_network
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: porto_cercado_frontend
+    container_name: portocercado2_frontend
     ports:
       - "3150:3000"
     environment:
-      - VITE_API_URL=http://localhost:8088
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8088}
     depends_on:
       - backend
     networks:
-      - porto_network
+      - portocercado2_network
 
 networks:
-  porto_network:
+  portocercado2_network:
     driver: bridge
+
+volumes:
+  portocercado2_postgres_data:
+  portocercado2_redis_data:

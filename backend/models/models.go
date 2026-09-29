@@ -1,109 +1,169 @@
 package models
 
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+type UserRole string
+
+const (
+	RoleAdmin UserRole = "admin"
+	RoleSuper UserRole = "super"
+)
+
+// User - Tabela exclusiva para Usuários Administrativos (Gestores e Super Admins)
+type User struct {
+	ID              uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name            string         `gorm:"type:varchar(255);not null" json:"name"`
+	Email           string         `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	Role            UserRole       `gorm:"type:varchar(50);not null;default:'admin'" json:"role"`
+	EmailVerifiedAt *time.Time     `json:"emailVerifiedAt,omitempty"`
+	Password        string         `gorm:"type:varchar(255);not null" json:"-"`
+	Ativo           bool           `gorm:"default:true" json:"ativo"`
+	RememberToken   *string        `gorm:"type:varchar(100)" json:"rememberToken,omitempty"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	UpdatedAt       time.Time      `json:"updatedAt"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
+}
+
+// SiteSetting - Tabela de Gerenciamento de Informação do Site (CMS) baseada na tabela `sites` do backup.sql
+type SiteSetting struct {
+	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Title           string    `gorm:"type:varchar(255)" json:"title"`
+	HeroTitle       string    `gorm:"type:varchar(255)" json:"heroTitle"`
+	HeroSubtitle    string    `gorm:"type:text" json:"heroSubtitle"`
+	HeroImage       string    `gorm:"type:varchar(255)" json:"heroImage"`
+	Logo            string    `gorm:"type:varchar(255)" json:"logo"`
+	StatsAssociados string    `gorm:"type:varchar(255)" json:"statsAssociados"`
+	StatsHistorico  string    `gorm:"type:varchar(255)" json:"statsHistorico"`
+	FooterText      string    `gorm:"type:text" json:"footerText"`
+	Address         string    `gorm:"type:varchar(255)" json:"address"`
+	Phone           string    `gorm:"type:varchar(255)" json:"phone"`
+	Whatsapp        string    `gorm:"type:varchar(255)" json:"whatsapp"`
+	Email           string    `gorm:"type:varchar(255)" json:"email"`
+	CNPJ            string    `gorm:"type:varchar(255)" json:"cnpj"`
+	Facebook        string    `gorm:"type:varchar(255)" json:"facebook"`
+	Instagram       string    `gorm:"type:varchar(255)" json:"instagram"`
+	AboutTitle      string    `gorm:"type:varchar(255)" json:"aboutTitle"`
+	AboutContent    string    `gorm:"type:text" json:"aboutContent"`
+	Benefit1Title   string    `gorm:"type:varchar(255)" json:"benefit1Title"`
+	Benefit1Desc    string    `gorm:"type:varchar(255)" json:"benefit1Desc"`
+	Benefit1Icon    string    `gorm:"type:varchar(255)" json:"benefit1Icon"`
+	Benefit2Title   string    `gorm:"type:varchar(255)" json:"benefit2Title"`
+	Benefit2Desc    string    `gorm:"type:varchar(255)" json:"benefit2Desc"`
+	Benefit2Icon    string    `gorm:"type:varchar(255)" json:"benefit2Icon"`
+	Benefit3Title   string    `gorm:"type:varchar(255)" json:"benefit3Title"`
+	Benefit3Desc    string    `gorm:"type:varchar(255)" json:"benefit3Desc"`
+	Benefit3Icon    string    `gorm:"type:varchar(255)" json:"benefit3Icon"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+// Article - CMS Notícias e Artigos
 type Article struct {
-	ID            string   `json:"id"`
-	Slug          string   `json:"slug"`
-	Title         string   `json:"title"`
-	Subtitle      string   `json:"subtitle,omitempty"`
-	Summary       string   `json:"summary"`
-	Content       []string `json:"content"`
-	Category      string   `json:"category"`
-	CategoryColor string   `json:"categoryColor"`
-	Tag           string   `json:"tag,omitempty"`
-	ImageURL      string   `json:"imageUrl"`
-	Author        Author   `json:"author"`
-	Date          string   `json:"date"`
-	ReadTime      string   `json:"readTime"`
-	Featured      bool     `json:"featured,omitempty"`
-	Shares        int      `json:"shares,omitempty"`
+	ID            uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Slug          string         `gorm:"type:varchar(255);uniqueIndex;not null" json:"slug"`
+	Title         string         `gorm:"type:varchar(255);not null" json:"title"`
+	Subtitle      string         `gorm:"type:varchar(255)" json:"subtitle,omitempty"`
+	Summary       string         `gorm:"type:text" json:"summary"`
+	Content       string         `gorm:"type:text" json:"content"`
+	Category      string         `gorm:"type:varchar(100)" json:"category"`
+	CategoryColor string         `gorm:"type:varchar(100)" json:"categoryColor"`
+	Tag           string         `gorm:"type:varchar(100)" json:"tag,omitempty"`
+	ImageURL      string         `gorm:"type:varchar(255)" json:"imageUrl"`
+	AuthorName    string         `gorm:"type:varchar(255)" json:"authorName"`
+	AuthorRole    string         `gorm:"type:varchar(255)" json:"authorRole"`
+	AuthorInit    string         `gorm:"type:varchar(10)" json:"authorInit"`
+	Date          string         `gorm:"type:varchar(100)" json:"date"`
+	ReadTime      string         `gorm:"type:varchar(50)" json:"readTime"`
+	Featured      bool           `gorm:"default:false" json:"featured"`
+	Shares        int            `gorm:"default:0" json:"shares"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
-type Author struct {
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	Initials string `json:"initials"`
-}
-
-type VideoEpisode struct {
-	ID            string `json:"id"`
-	Title         string `json:"title"`
-	Category      string `json:"category"`
-	CategoryColor string `json:"categoryColor"`
-	Duration      string `json:"duration"`
-	Published     string `json:"published"`
-	ImageURL      string `json:"imageUrl"`
-	Presenter     string `json:"presenter,omitempty"`
-	Description   string `json:"description,omitempty"`
-	VideoURL      string `json:"videoUrl,omitempty"`
-}
-
-type PhotoAlbum struct {
-	ID          string      `json:"id"`
-	Title       string      `json:"title"`
-	Category    string      `json:"category"`
-	PhotoCount  int         `json:"photoCount"`
-	CoverURL    string      `json:"coverUrl"`
-	Date        string      `json:"date"`
-	Location    string      `json:"location"`
-	Description string      `json:"description"`
-	Photos      []PhotoItem `json:"photos"`
-}
-
-type PhotoItem struct {
-	URL     string `json:"url"`
-	Caption string `json:"caption"`
-}
-
+// OfficialDocument - CMS Editais e Atas
 type OfficialDocument struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Code        string `json:"code"`
-	Type        string `json:"type"`
-	Date        string `json:"date"`
-	Size        string `json:"size"`
-	Status      string `json:"status"`
-	Summary     string `json:"summary"`
-	Description string `json:"description,omitempty"`
-	Category    string `json:"category,omitempty"`
-	DownloadURL string `json:"downloadUrl"`
+	ID          uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Title       string         `gorm:"type:varchar(255);not null" json:"title"`
+	Code        string         `gorm:"type:varchar(100)" json:"code"`
+	Type        string         `gorm:"type:varchar(100)" json:"type"`
+	Date        string         `gorm:"type:varchar(100)" json:"date"`
+	Size        string         `gorm:"type:varchar(50)" json:"size"`
+	Status      string         `gorm:"type:varchar(50)" json:"status"`
+	Summary     string         `gorm:"type:text" json:"summary"`
+	Description string         `gorm:"type:text" json:"description,omitempty"`
+	Category    string         `gorm:"type:varchar(100)" json:"category,omitempty"`
+	DownloadURL string         `gorm:"type:varchar(255)" json:"downloadUrl"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
+// CalendarEvent - CMS Agenda de Eventos
 type CalendarEvent struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Day         string `json:"day"`
-	Month       string `json:"month"`
-	Year        string `json:"year"`
-	Time        string `json:"time"`
-	Modality    string `json:"modality"`
-	Location    string `json:"location"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
-	Registered  bool   `json:"registered,omitempty"`
+	ID          uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Title       string         `gorm:"type:varchar(255);not null" json:"title"`
+	Day         string         `gorm:"type:varchar(10)" json:"day"`
+	Month       string         `gorm:"type:varchar(20)" json:"month"`
+	Year        string         `gorm:"type:varchar(10)" json:"year"`
+	Time        string         `gorm:"type:varchar(50)" json:"time"`
+	Modality    string         `gorm:"type:varchar(100)" json:"modality"`
+	Location    string         `gorm:"type:varchar(255)" json:"location"`
+	Description string         `gorm:"type:text" json:"description"`
+	Category    string         `gorm:"type:varchar(100)" json:"category"`
+	Registered  bool           `gorm:"default:false" json:"registered"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
-type MemberProfile struct {
-	Name               string `json:"name"`
-	RegistrationNumber string `json:"registrationNumber"`
-	Category           string `json:"category"`
-	Section            string `json:"section"`
-	Status             string `json:"status"`
-	SinceYear          string `json:"sinceYear"`
-	ValidThrough       string `json:"validThrough"`
-	CPFMasked          string `json:"cpfMasked"`
+// VideoEpisode - CMS Vídeos / TV Porto Cercado
+type VideoEpisode struct {
+	ID            uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Title         string         `gorm:"type:varchar(255);not null" json:"title"`
+	Category      string         `gorm:"type:varchar(100)" json:"category"`
+	CategoryColor string         `gorm:"type:varchar(100)" json:"categoryColor"`
+	Duration      string         `gorm:"type:varchar(50)" json:"duration"`
+	Published     string         `gorm:"type:varchar(100)" json:"published"`
+	ImageURL      string         `gorm:"type:varchar(255)" json:"imageUrl"`
+	Presenter     string         `gorm:"type:varchar(255)" json:"presenter,omitempty"`
+	Description   string         `gorm:"type:text" json:"description,omitempty"`
+	VideoURL      string         `gorm:"type:varchar(255)" json:"videoUrl,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
-type ArticleComment struct {
-	ID          string `json:"id"`
-	ArticleSlug string `json:"articleSlug"`
-	AuthorName  string `json:"authorName"`
-	AuthorEmail string `json:"authorEmail"`
-	AuthorRole  string `json:"authorRole,omitempty"`
-	IsPremium   bool   `json:"isPremium"`
-	Content     string `json:"content"`
-	CreatedAt   string `json:"createdAt"`
-	Likes       int    `json:"likes"`
-	LikedByMe   bool   `json:"likedByMe,omitempty"`
+// --- DTOs (Data Transfer Objects) ---
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+type CreateUserRequest struct {
+	Name     string   `json:"name"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Role     UserRole `json:"role"`
+	Ativo    bool     `json:"ativo"`
+}
+
+type UpdateUserRequest struct {
+	Name     string   `json:"name"`
+	Email    string   `json:"email"`
+	Password string   `json:"password,omitempty"`
+	Role     UserRole `json:"role"`
+	Ativo    bool     `json:"ativo"`
 }
 
 type AIChatRequest struct {

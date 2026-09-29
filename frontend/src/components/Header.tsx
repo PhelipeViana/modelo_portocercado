@@ -18,7 +18,9 @@ import {
   IdCard,
   UserCog,
   CheckCircle2,
-  MapPin
+  MapPin,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import { PORTO_CERCADO_INFO } from '../data/pesqueirosData';
 import { getLoggedUser, LoggedUser } from '../data/userData';
@@ -270,6 +272,16 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </button>
             )}
+
+            {/* Botão de Acesso ao Painel Admin */}
+            <a
+              href="#/admin"
+              className="hidden md:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer border border-slate-700"
+              title="Acesso ao Painel Administrativo CMS"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Painel Admin</span>
+            </a>
 
             {/* Botão Doar em Destaque (Responsivo, sem cortar no mobile) */}
             <button
