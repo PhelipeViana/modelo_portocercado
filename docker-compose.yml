@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: porto_cercado_backend
+    ports:
+      - "8088:8080"
+    environment:
+      - PORT=8080
+      - ENV=development
+    restart: unless-stopped
+    networks:
+      - porto_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: porto_cercado_frontend
+    ports:
+      - "3150:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8088
+    depends_on:
+      - backend
+    networks:
+      - porto_network
+
+networks:
+  porto_network:
+    driver: bridge
