@@ -64,38 +64,32 @@ export default function App() {
   const [isDonationOpen, setIsDonationOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
 
-  // URL Hash & Path Router Synchronization
+  // URL Hash Router Synchronization
   useEffect(() => {
     const parseRoute = () => {
-      const hash = window.location.hash.replace(/^#\/?/, '');
-      const path = window.location.pathname.replace(/^\//, '');
+      const rawHash = window.location.hash.replace(/^#\/?/, '');
 
-      if (hash === 'admin' || path === 'admin') {
+      if (rawHash === 'admin') {
         setIsAdminRoute(true);
         return;
       }
 
       setIsAdminRoute(false);
 
-      // Check if user clicked direct donation route
-      if (hash === 'doar' || path === 'doar') {
+      if (rawHash === 'doar') {
         setIsDonationOpen(true);
       }
 
-      // Check for noticia slug in hash or path
-      let noticiaSlug = '';
-      if (hash.startsWith('noticia/')) {
-        noticiaSlug = hash.replace('noticia/', '').split('?')[0];
-      } else if (path.startsWith('noticia/')) {
-        noticiaSlug = path.replace('noticia/', '').split('?')[0];
-      }
-
-      if (noticiaSlug) {
-        const found = getArticleBySlug(noticiaSlug);
-        if (found) {
-          setActiveArticle(found);
-          setCurrentTab('noticia');
-          return;
+      // Check for noticia slug in hash
+      if (rawHash.startsWith('noticia/')) {
+        const noticiaSlug = rawHash.replace('noticia/', '').split('?')[0];
+        if (noticiaSlug) {
+          const found = getArticleBySlug(noticiaSlug);
+          if (found) {
+            setActiveArticle(found);
+            setCurrentTab('noticia');
+            return;
+          }
         }
       }
 
@@ -111,14 +105,13 @@ export default function App() {
         'agenda-de-eventos'
       ];
 
-      const cleanHash = hash.split('?')[0] as ScreenTab;
-      const cleanPath = path.split('?')[0] as ScreenTab;
+      const cleanHash = rawHash.split('?')[0] as ScreenTab;
 
       if (validTabs.includes(cleanHash)) {
         setCurrentTab(cleanHash);
         setActiveArticle(null);
-      } else if (validTabs.includes(cleanPath)) {
-        setCurrentTab(cleanPath);
+      } else if (!rawHash) {
+        setCurrentTab('inicio');
         setActiveArticle(null);
       }
     };
@@ -136,14 +129,15 @@ export default function App() {
   const handleSelectArticle = (article: Article) => {
     setActiveArticle(article);
     setCurrentTab('noticia');
-    window.history.pushState({ slug: article.slug }, '', `#/noticia/${article.slug}`);
+    window.location.hash = `#/noticia/${article.slug}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavigateHome = () => {
+    setIsAdminRoute(false);
     setActiveArticle(null);
     setCurrentTab('inicio');
-    window.history.pushState(null, '', '#/');
+    window.location.hash = '#/';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

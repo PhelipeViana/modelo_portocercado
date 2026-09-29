@@ -15,10 +15,12 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DB          *gorm.DB
-	RedisClient *redis.Client
-	JWTSecret   string
+	Port              string
+	DB                *gorm.DB
+	RedisClient       *redis.Client
+	JWTSecret         string
+	OpenRouterAPIKey  string
+	OpenRouterModel   string
 }
 
 func getEnv(key, defaultValue string) string {
@@ -36,6 +38,8 @@ func InitConfig() (*Config, error) {
 
 	port := getEnv("PORT", "8080")
 	jwtSecret := getEnv("JWT_SECRET", "portocercado2_super_secret_key_2026")
+	openRouterKey := getEnv("OPENROUTER_API_KEY", "")
+	openRouterModel := getEnv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 
 	// PostgreSQL Config (referências portocercado2)
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -82,9 +86,11 @@ func InitConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Port:        port,
-		DB:          db,
-		RedisClient: rdb,
-		JWTSecret:   jwtSecret,
+		Port:             port,
+		DB:               db,
+		RedisClient:      rdb,
+		JWTSecret:        jwtSecret,
+		OpenRouterAPIKey: openRouterKey,
+		OpenRouterModel:  openRouterModel,
 	}, nil
 }
