@@ -144,7 +144,7 @@ export const SidebarWidgets: React.FC<SidebarWidgetsProps> = ({
 
         {!hasVoted ? (
           <form onSubmit={handleVote} className="space-y-2.5">
-            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-slate-750 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700">
+            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-700">
               <input
                 className="accent-emerald-600 w-4 h-4 cursor-pointer"
                 name="poll_option"
@@ -158,7 +158,7 @@ export const SidebarWidgets: React.FC<SidebarWidgetsProps> = ({
               </span>
             </label>
 
-            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-slate-750 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700">
+            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-700">
               <input
                 className="accent-emerald-600 w-4 h-4 cursor-pointer"
                 name="poll_option"
@@ -172,7 +172,7 @@ export const SidebarWidgets: React.FC<SidebarWidgetsProps> = ({
               </span>
             </label>
 
-            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-slate-750 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700">
+            <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-800/90 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 cursor-pointer transition-colors border border-emerald-100 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-700">
               <input
                 className="accent-emerald-600 w-4 h-4 cursor-pointer"
                 name="poll_option"

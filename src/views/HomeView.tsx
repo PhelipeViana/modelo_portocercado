@@ -35,7 +35,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Main 8-col News Feed */}
-          <div className="lg:col-span-8">
+          <div className="min-w-0 lg:col-span-8">
             <NewsFeedSection
               articles={ARTICLES_DATA}
               onSelectArticle={onSelectArticle}
@@ -44,10 +44,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           {/* 4-col Sidebar */}
-          <SidebarWidgets
-            onNavigateTab={onNavigateTab}
-            onOpenDocumentModal={onOpenDocumentModal}
-          />
+          <div className="min-w-0 lg:col-span-4">
+            <SidebarWidgets
+              onNavigateTab={onNavigateTab}
+              onOpenDocumentModal={onOpenDocumentModal}
+            />
+          </div>
         </div>
       </section>
 

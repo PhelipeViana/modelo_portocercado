@@ -197,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Middle Bar: Logo, Título, Doar e Botão do Menu (Fluido, flexível, sem corte de texto no mobile) */}
-        <div className="min-h-[58px] sm:min-h-[72px] flex items-center justify-between gap-2 sm:gap-4 py-2 sm:py-2.5">
+        <div className="min-h-[58px] sm:min-h-[72px] flex items-center justify-between gap-1.5 sm:gap-4 py-2 sm:py-2.5">
           
           {/* Logo Oficial Porto Cercado & Título */}
           <button 
@@ -205,16 +205,16 @@ export const Header: React.FC<HeaderProps> = ({
               onSelectTab('inicio');
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2 sm:gap-3 text-left min-w-0 max-w-[65%] sm:max-w-none group focus:outline-none cursor-pointer shrink"
+            className="flex flex-1 items-center gap-2 sm:gap-3 text-left min-w-0 group focus:outline-none cursor-pointer"
           >
             <img 
               src={PORTO_CERCADO_INFO.logoUrl} 
               alt="Logo Associação dos Ribeirinhos do Porto Cercado" 
-              className="h-9 sm:h-11 md:h-12 w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-transform shrink-0"
+              className="h-8 sm:h-11 md:h-12 w-auto object-contain drop-shadow-xs group-hover:scale-105 transition-transform shrink-0"
               referrerPolicy="no-referrer"
             />
             <div className="min-w-0 flex-1">
-              <span className="font-sans text-base sm:text-lg lg:text-[22px] tracking-tight font-black text-slate-900 dark:text-white leading-tight block truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+              <span className="font-sans text-sm sm:text-lg lg:text-[22px] tracking-tight font-black text-slate-900 dark:text-white leading-tight block truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                 PORTO CERCADO
               </span>
               <span className="text-[9px] sm:text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight sm:tracking-widest block truncate">
@@ -244,7 +244,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Ações da Direita: Usuário Logado, Doar e Botão Menu Mobile */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             
             {/* Box Desktop: Usuário Logado & Acesso a Editar Dados */}
             {onOpenEditUser && (
@@ -274,7 +274,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Botão Doar em Destaque (Responsivo, sem cortar no mobile) */}
             <button
               onClick={onOpenDonation}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-amber-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-sm hover:shadow-md transition-all cursor-pointer transform hover:scale-[1.02] active:scale-95 border border-amber-300/80 shrink-0"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-amber-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-sm hover:shadow-md transition-all cursor-pointer transform hover:scale-[1.02] active:scale-95 border border-amber-300/80 shrink-0"
               title="Apoie os Pescadores e Ribeirinhos de Porto Cercado"
             >
               <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-950 text-amber-950 animate-pulse" />

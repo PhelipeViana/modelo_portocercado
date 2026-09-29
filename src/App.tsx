@@ -12,6 +12,7 @@ import { AgendaView } from './views/AgendaView';
 import { InscricaoView } from './views/InscricaoView';
 import { AreaAssociadoView } from './views/AreaAssociadoView';
 import { NoticiaView } from './views/NoticiaView';
+import { AdminView } from './views/AdminView';
 
 import { GalleryLightbox } from './components/GalleryLightbox';
 import { VideoPlayerModal } from './components/VideoPlayerModal';
@@ -26,6 +27,12 @@ import { ARTICLES_DATA, VIDEOS_DATA, PHOTO_ALBUMS, getArticleBySlug } from './da
 export default function App() {
   const [currentTab, setCurrentTab] = useState<ScreenTab>('inicio');
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
+  const [isAdminRoute, setIsAdminRoute] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash.replace(/^#\/?/, '');
+    const path = window.location.pathname.replace(/^\//, '');
+    return hash === 'admin' || path === 'admin';
+  });
   
   // Accessibility and Theme state
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -62,6 +69,13 @@ export default function App() {
     const parseRoute = () => {
       const hash = window.location.hash.replace(/^#\/?/, '');
       const path = window.location.pathname.replace(/^\//, '');
+
+      if (hash === 'admin' || path === 'admin') {
+        setIsAdminRoute(true);
+        return;
+      }
+
+      setIsAdminRoute(false);
 
       // Check if user clicked direct donation route
       if (hash === 'doar' || path === 'doar') {
@@ -134,6 +148,7 @@ export default function App() {
   };
 
   const handleSelectTab = (tab: ScreenTab) => {
+    setIsAdminRoute(false);
     if (tab !== 'noticia') {
       setActiveArticle(null);
     }
@@ -187,6 +202,16 @@ export default function App() {
     : fontSizeLevel === 2 
     ? 'text-[18px]' 
     : 'text-base';
+
+  if (isAdminRoute) {
+    return (
+      <AdminView
+        darkMode={darkMode}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+        onExit={handleNavigateHome}
+      />
+    );
+  }
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
@@ -327,4 +352,3 @@ export default function App() {
     </div>
   );
 }
-
