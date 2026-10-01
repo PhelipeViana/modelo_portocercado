@@ -295,3 +295,209 @@ export async function sendAIChat(prompt: string): Promise<AIArticleDraft> {
     };
   }
 }
+
+// --- Métricas, Comentários, Mídia e CRUD CMS Adicionais ---
+
+export async function incrementArticleView(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/articles/${id}/view`, { method: 'POST' });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function incrementArticleShare(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/articles/${id}/share`, { method: 'POST' });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function fetchRelatedArticles(slug: string): Promise<Article[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/articles/${slug}/related`);
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return rows.map((row: any): Article => ({
+      id: String(row.id), slug: row.slug, title: row.title, subtitle: row.subtitle || '', summary: row.summary || '',
+      content: Array.isArray(row.content) ? row.content : [String(row.content || '')],
+      category: row.category || 'Comunidade', categoryColor: row.categoryColor || 'emerald', tag: row.tag,
+      imageUrl: row.imageUrl || '', author: { name: row.authorName || 'Associação Porto Cercado', role: row.authorRole || 'Comunicação', initials: row.authorInit || 'PC' },
+      date: row.date || '', readTime: row.readTime || '3 min', featured: row.featured, shares: row.shares || 0, viewCount: row.viewCount || 0, videoUrl: row.videoUrl || '',
+    }));
+  } catch { return []; }
+}
+
+export async function fetchArticleComments(articleId: number): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/comments`);
+    return res.ok ? await res.json() : [];
+  } catch { return []; }
+}
+
+export async function postArticleComment(articleId: number, authorName: string, authorEmail: string, content: string, parentId?: number): Promise<boolean> {
+  try {
+    const payload: any = { authorName, authorEmail, content };
+    if (parentId) payload.parentId = parentId;
+    const res = await fetch(`${API_BASE_URL}/api/articles/${articleId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function fetchAdminComments(token: string): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    return res.ok ? await res.json() : [];
+  } catch { return []; }
+}
+
+export async function updateCommentStatus(id: number, status: 'approved' | 'pending' | 'rejected', token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/comments/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function deleteComment(id: number, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/comments/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function fetchMediaFiles(token: string): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/media`, { headers: { Authorization: `Bearer ${token}` } });
+    return res.ok ? await res.json() : [];
+  } catch { return []; }
+}
+
+export async function deleteMediaFile(filename: string, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/media/${encodeURIComponent(filename)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function saveManagedDocument(doc: Partial<OfficialDocument>, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(doc),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function removeManagedDocument(id: number, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/documents/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function saveManagedEvent(event: Partial<CalendarEvent>, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(event),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function removeManagedEvent(id: number, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/events/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function saveManagedVideo(video: Partial<VideoEpisode>, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/videos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(video),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function removeManagedVideo(id: number, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/videos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+
+// --- Assinantes ---
+
+export async function registerSubscriberApi(name: string, email: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/subscribers/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Erro ao cadastrar assinante');
+    }
+    return await res.json();
+  } catch (err: any) {
+    return { error: err.message || 'Erro de conexão' };
+  }
+}
+
+export async function loginSubscriberApi(email: string): Promise<any> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/subscribers/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Assinante não encontrado');
+    }
+    return await res.json();
+  } catch (err: any) {
+    return { error: err.message || 'Erro de conexão' };
+  }
+}
+
+export async function fetchAdminSubscribers(token: string): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/subscribers`, { headers: { Authorization: `Bearer ${token}` } });
+    return res.ok ? await res.json() : [];
+  } catch { return []; }
+}
+
+export async function toggleSubscriberStatus(id: number, ativo: boolean, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/subscribers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ativo }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function deleteSubscriber(id: number, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/admin/subscribers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    return res.ok;
+  } catch { return false; }
+}
+

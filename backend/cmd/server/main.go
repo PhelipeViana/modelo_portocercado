@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"porto-cercado-backend/config"
+	"porto-cercado-backend/database/migrations"
 	"porto-cercado-backend/handlers"
 	"porto-cercado-backend/middleware"
 	"porto-cercado-backend/models"
@@ -22,7 +23,12 @@ func main() {
 		log.Fatalf("Erro crítico ao inicializar configurações: %v", err)
 	}
 
-	// 2. Inicializar serviço de cache Redis
+	// 2. Executar migrações automáticas de banco de dados
+	if err := migrations.RunMigrations(cfg.DB); err != nil {
+		log.Printf("⚠️ Aviso na execução de migrações: %v", err)
+	}
+
+	// 3. Inicializar serviço de cache Redis
 	cache := services.NewCacheService(cfg.RedisClient)
 
 	// 3. Criar aplicação Fiber v2
@@ -55,6 +61,16 @@ func main() {
 	api.Get("/site/info", handlers.GetSiteInfoHandler(cfg, cache))
 	api.Get("/articles", handlers.GetArticlesHandler(cfg, cache))
 	api.Get("/articles/:slug", handlers.GetArticleBySlugHandler(cfg, cache))
+	api.Get("/articles/:slug/related", handlers.GetRelatedArticlesHandler(cfg, cache))
+	api.Post("/articles/:id/view", handlers.IncrementArticleViewHandler(cfg, cache))
+	api.Post("/articles/:id/share", handlers.IncrementArticleShareHandler(cfg, cache))
+	api.Get("/articles/:id/comments", handlers.GetArticleCommentsHandler(cfg))
+	api.Post("/articles/:id/comments", handlers.CreateCommentHandler(cfg))
+
+	// Assinantes
+	api.Post("/subscribers/register", handlers.RegisterSubscriberHandler(cfg))
+	api.Post("/subscribers/login", handlers.LoginSubscriberHandler(cfg))
+
 	api.Get("/documents", handlers.GetDocumentsHandler(cfg, cache))
 	api.Get("/events", handlers.GetEventsHandler(cfg, cache))
 	api.Get("/videos", handlers.GetVideosHandler(cfg, cache))
@@ -72,6 +88,19 @@ func main() {
 	admin.Get("/admin/articles", handlers.GetAdminArticlesHandler(cfg))
 	admin.Post("/ai/image", handlers.GenerateArticleImageHandler(cfg))
 	admin.Post("/uploads/images", handlers.UploadImageHandler(cfg))
+
+	// Mídia Uploads & Gerenciamento
+	admin.Get("/admin/media", handlers.GetMediaFilesHandler(cfg))
+	admin.Delete("/admin/media/:filename", handlers.DeleteMediaFileHandler(cfg))
+
+	// Moderação de Comentários & Assinantes
+	admin.Get("/admin/comments", handlers.GetAdminCommentsHandler(cfg))
+	admin.Put("/admin/comments/:id/status", handlers.UpdateCommentStatusHandler(cfg))
+	admin.Delete("/admin/comments/:id", handlers.DeleteCommentHandler(cfg))
+
+	admin.Get("/admin/subscribers", handlers.GetAdminSubscribersHandler(cfg))
+	admin.Put("/admin/subscribers/:id", handlers.ToggleSubscriberStatusHandler(cfg))
+	admin.Delete("/admin/subscribers/:id", handlers.DeleteSubscriberHandler(cfg))
 
 	// Gerenciamento de Usuários e Nível de Acesso
 	admin.Get("/users", handlers.GetUsersHandler(cfg, cache))

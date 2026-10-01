@@ -4,9 +4,12 @@ import {
   ArrowLeft,
   Bell,
   Bot,
+  Check,
   CheckCircle2,
   ChevronDown,
   Clock3,
+  Copy,
+  ExternalLink,
   FilePenLine,
   FileText,
   Globe,
@@ -14,6 +17,7 @@ import {
   Lock,
   LogOut,
   Menu,
+  MessageCircle,
   MoreHorizontal,
   Moon,
   Newspaper,
@@ -26,6 +30,7 @@ import {
   Sparkles,
   Sun,
   Trash2,
+  UserCheck,
   UserPlus,
   Users,
   X,
@@ -43,15 +48,23 @@ import {
   uploadArticleImage,
   generateArticleImage,
   sendAIChat,
+  fetchAdminComments,
+  updateCommentStatus,
+  deleteComment,
+  fetchMediaFiles,
+  deleteMediaFile,
+  fetchAdminSubscribers,
+  toggleSubscriberStatus,
+  deleteSubscriber,
   AIResearchSource,
   SiteInfoData,
   UserAccount
 } from '../services/api';
-import { Article } from '../types';
+import { Article, ArticleComment, MediaFile, Subscriber } from '../types';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { ImageCropDialog } from '../components/ImageCropDialog';
 
-type ArticleStatus = 'Publicado' | 'Rascunho' | 'Agendado';
+type ArticleStatus = 'Publicado' | 'Rascunho';
 
 interface ManagedArticle {
   id: number;
@@ -72,7 +85,6 @@ interface ManagedArticle {
 const statusStyles: Record<ArticleStatus, string> = {
   Publicado: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300',
   Rascunho: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-950/50 dark:text-amber-300',
-  Agendado: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-950/50 dark:text-blue-300',
 };
 
 interface AdminViewProps {
@@ -118,6 +130,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
   const [isSavingArticle, setIsSavingArticle] = useState(false);
   const [notice, setNotice] = useState('');
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
+  // Admin Comments, Media & Subscribers State
+  const [adminComments, setAdminComments] = useState<any[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [subscribersList, setSubscribersList] = useState<Subscriber[]>([]);
 
   // CMS Site Info State
   const [siteData, setSiteData] = useState<SiteInfoData>({
@@ -165,8 +182,83 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
       loadSiteInfo();
       loadUsersData();
       loadBackendArticles();
+      loadAdminCommentsData();
+      loadMediaFilesData();
+      loadAdminSubscribersData();
     }
   }, [token]);
+
+  const loadAdminCommentsData = async () => {
+    if (!token) return;
+    const data = await fetchAdminComments(token);
+    setAdminComments(data);
+  };
+
+  const loadMediaFilesData = async () => {
+    if (!token) return;
+    const data = await fetchMediaFiles(token);
+    setMediaFiles(data);
+  };
+
+  const loadAdminSubscribersData = async () => {
+    if (!token) return;
+    const data = await fetchAdminSubscribers(token);
+    setSubscribersList(data);
+  };
+
+  const handleToggleSubscriberStatus = async (id: number, currentAtivo: boolean) => {
+    if (!token) return;
+    const success = await toggleSubscriberStatus(id, !currentAtivo, token);
+    if (success) {
+      setNotice(`Assinatura alterada para ${!currentAtivo ? 'Ativa' : 'Inativa'}.`);
+      loadAdminSubscribersData();
+    }
+  };
+
+  const handleDeleteSubscriber = async (id: number) => {
+    if (!token || !confirm('Deseja realmente remover este assinante?')) return;
+    const success = await deleteSubscriber(id, token);
+    if (success) {
+      setNotice('Assinante removido.');
+      loadAdminSubscribersData();
+    }
+  };
+
+  const handleApproveComment = async (id: number) => {
+    if (!token) return;
+    const success = await updateCommentStatus(id, 'approved', token);
+    if (success) {
+      setNotice('Comentário aprovado com sucesso!');
+      loadAdminCommentsData();
+    }
+  };
+
+  const handleRejectComment = async (id: number) => {
+    if (!token) return;
+    const success = await updateCommentStatus(id, 'rejected', token);
+    if (success) {
+      setNotice('Comentário rejeitado.');
+      loadAdminCommentsData();
+    }
+  };
+
+  const handleDeleteComment = async (id: number) => {
+    if (!token || !confirm('Deseja excluir este comentário?')) return;
+    const success = await deleteComment(id, token);
+    if (success) {
+      setNotice('Comentário excluído.');
+      loadAdminCommentsData();
+    }
+  };
+
+  const handleDeleteMedia = async (filename: string) => {
+    if (!token || !confirm(`Deseja excluir o arquivo "${filename}"?`)) return;
+    const success = await deleteMediaFile(filename, token);
+    if (success) {
+      setNotice('Arquivo de mídia excluído com sucesso.');
+      loadMediaFilesData();
+    }
+  };
 
   const loadSiteInfo = async () => {
     const data = await fetchSiteInfo();
@@ -402,8 +494,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
   const navigation = [
     { label: 'Visão geral', icon: LayoutDashboard },
     { label: 'Notícias', icon: Newspaper },
-    { label: 'Rascunhos', icon: FilePenLine },
-    { label: 'Mídia', icon: Archive },
+    { label: 'Moderação de Comentários', icon: MessageCircle },
+    { label: 'Assinantes', icon: UserCheck },
+    { label: 'Biblioteca de Mídia', icon: Archive },
     { label: 'Ajustes do portal', icon: Globe },
     { label: 'Usuários Admin', icon: Users },
   ];
@@ -843,8 +936,230 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
             </div>
           )}
 
-          {/* SECTION 3: VISÃO GERAL / NOTÍCIAS (STANDARD ORIGINAL DASHBOARD) */}
-          {(activeSection === 'Visão geral' || activeSection === 'Notícias' || activeSection === 'Rascunhos' || activeSection === 'Mídia') && (
+          {/* SECTION: MODERAÇÃO DE COMENTÁRIOS */}
+          {activeSection === 'Moderação de Comentários' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Voz Comunitária</p>
+                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Moderação de Comentários</h2>
+                  <p className="text-xs text-slate-500 mt-1">Aprove ou rejeite comentários enviados pelos leitores do portal.</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-black uppercase text-slate-500 dark:border-slate-800 dark:bg-slate-950">
+                      <th className="py-3 px-4">Autor</th>
+                      <th className="py-3 px-4">Notícia</th>
+                      <th className="py-3 px-4">Comentário</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
+                    {adminComments.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/50">
+                        <td className="py-3.5 px-4">
+                          <p className="font-bold">{c.authorName}</p>
+                          <p className="text-[11px] text-slate-400">{c.authorEmail}</p>
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-600 dark:text-slate-300 max-w-[150px] truncate">
+                          {c.articleTitle || `Notícia #${c.articleId}`}
+                        </td>
+                        <td className="py-3.5 px-4 max-w-xs leading-relaxed text-slate-700 dark:text-slate-200">
+                          {c.content}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                            c.status === 'approved'
+                              ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : c.status === 'pending'
+                              ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20 dark:bg-amber-950/60 dark:text-amber-300'
+                              : 'bg-red-50 text-red-700 ring-1 ring-red-600/20 dark:bg-red-950/60 dark:text-red-300'
+                          }`}>
+                            {c.status === 'approved' ? 'Aprovado' : c.status === 'pending' ? 'Pendente' : 'Rejeitado'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {c.status !== 'approved' && (
+                              <button
+                                type="button"
+                                onClick={() => handleApproveComment(c.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] inline-flex items-center gap-1"
+                                title="Aprovar Comentário"
+                              >
+                                <Check className="h-3.5 w-3.5" /> Aprovar
+                              </button>
+                            )}
+                            {c.status !== 'rejected' && (
+                              <button
+                                type="button"
+                                onClick={() => handleRejectComment(c.id)}
+                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-[11px]"
+                                title="Rejeitar Comentário"
+                              >
+                                Rejeitar
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(c.id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"
+                              title="Excluir Comentário"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {adminComments.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                          Nenhum comentário registrado no sistema.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: ASSINANTES DO PORTAL */}
+          {activeSection === 'Assinantes' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Controle de Assinaturas</p>
+                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Assinantes do Portal</h2>
+                  <p className="text-xs text-slate-500 mt-1">Gerencie a lista de assinantes cadastrados e altere o status de acesso para comentários.</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-black uppercase text-slate-500 dark:border-slate-800 dark:bg-slate-950">
+                      <th className="py-3 px-4">Nome do Assinante</th>
+                      <th className="py-3 px-4">E-mail</th>
+                      <th className="py-3 px-4">Status da Assinatura</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
+                    {subscribersList.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/50">
+                        <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{s.name}</td>
+                        <td className="py-3.5 px-4 text-slate-500">{s.email}</td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                            s.ativo
+                              ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-red-50 text-red-700 ring-1 ring-red-600/20 dark:bg-red-950/60 dark:text-red-300'
+                          }`}>
+                            {s.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSubscriberStatus(s.id, s.ativo)}
+                              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                s.ativo
+                                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                              }`}
+                            >
+                              {s.ativo ? 'Desativar Assinatura' : 'Ativar Assinatura'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubscriber(s.id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"
+                              title="Remover Assinante"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {subscribersList.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-slate-400 font-medium">
+                          Nenhum assinante cadastrado até o momento.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: BIBLIOTECA DE MÍDIA */}
+          {activeSection === 'Biblioteca de Mídia' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Armazenamento CMS</p>
+                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Biblioteca de Mídia</h2>
+                  <p className="text-xs text-slate-500 mt-1">Gerencie arquivos e imagens salvos no servidor.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {mediaFiles.map((m) => (
+                  <div key={m.name} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
+                    <div>
+                      <div className="aspect-video w-full overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-950 mb-3 relative group">
+                        <img src={`http://localhost:8088${m.url}`} alt={m.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                        <a href={`http://localhost:8088${m.url}`} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                          <ExternalLink className="h-5 w-5" />
+                        </a>
+                      </div>
+                      <p className="font-bold text-xs truncate text-slate-900 dark:text-white" title={m.name}>{m.name}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{(m.size / 1024).toFixed(1)} KB • {m.updatedAt}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`http://localhost:8088${m.url}`);
+                          setNotice('URL da imagem copiada para a área de transferência!');
+                        }}
+                        className="text-xs font-bold text-emerald-600 hover:text-emerald-500 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="h-3.5 w-3.5" /> Copiar Link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMedia(m.name)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"
+                        title="Excluir arquivo"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {mediaFiles.length === 0 && (
+                  <div className="col-span-full p-12 text-center text-slate-400 font-medium">
+                    Nenhum arquivo de mídia encontrado na pasta de uploads.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 3: VISÃO GERAL / NOTÍCIAS */}
+          {(activeSection === 'Visão geral' || activeSection === 'Notícias') && (
             <>
               <section className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                 <div>
@@ -864,9 +1179,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
 
               <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {[
-                  [articles.length.toString(), 'Notícias no portal', Newspaper, 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300'],
-                  ['3', 'Rascunhos em revisão', FilePenLine, 'text-amber-600 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300'],
-                  ['2', 'Agendadas para a semana', Clock3, 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300'],
+                  [articles.filter((a) => a.statusCode === 'published').length.toString(), 'Notícias publicadas', Newspaper, 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300'],
+                  [articles.filter((a) => a.statusCode === 'draft').length.toString(), 'Rascunhos em revisão', FilePenLine, 'text-amber-600 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300'],
+                  [adminComments.filter((c) => c.status === 'pending').length.toString(), 'Comentários pendentes', MessageCircle, 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300'],
                   [usersList.length.toString(), 'Administradores Ativos', Users, 'text-violet-600 bg-violet-50 dark:bg-violet-950/50 dark:text-violet-300']
                 ].map(([value, label, Icon, colors]) => {
                   const StatIcon = Icon as React.ElementType;

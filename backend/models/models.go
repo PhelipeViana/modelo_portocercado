@@ -28,6 +28,17 @@ type User struct {
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
+// Subscriber - Tabela de Assinantes para publicação de comentários
+type Subscriber struct {
+	ID        uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name      string         `gorm:"type:varchar(255);not null" json:"name"`
+	Email     string         `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	Ativo     bool           `gorm:"default:true" json:"ativo"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
+}
+
 // SiteSetting - Tabela de Gerenciamento de Informação do Site (CMS) baseada na tabela `sites` do backup.sql
 type SiteSetting struct {
 	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -82,9 +93,35 @@ type Article struct {
 	Featured      bool           `gorm:"default:false" json:"featured"`
 	Status        string         `gorm:"type:varchar(20);not null;default:'published';index" json:"status"`
 	Shares        int            `gorm:"default:0" json:"shares"`
+	ViewCount     uint           `gorm:"default:0" json:"viewCount"`
+	PublishedAt   *time.Time     `json:"publishedAt,omitempty"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
+}
+
+type CommentStatus string
+
+const (
+	CommentPending  CommentStatus = "pending"
+	CommentApproved CommentStatus = "approved"
+	CommentRejected CommentStatus = "rejected"
+)
+
+// Comment - Comentários em Notícias
+type Comment struct {
+	ID          uint           `gorm:"primaryKey;autoIncrement" json:"id"`
+	ArticleID   uint           `gorm:"not null;index" json:"articleId"`
+	ParentID    *uint          `gorm:"index" json:"parentId,omitempty"`
+	Article     *Article       `gorm:"foreignKey:ArticleID" json:"article,omitempty"`
+	ArticleTitle string        `gorm:"-" json:"articleTitle,omitempty"`
+	AuthorName  string         `gorm:"type:varchar(255);not null" json:"authorName"`
+	AuthorEmail string         `gorm:"type:varchar(255);not null" json:"authorEmail"`
+	Content     string         `gorm:"type:text;not null" json:"content"`
+	Status      CommentStatus  `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deletedAt,omitempty"`
 }
 
 // OfficialDocument - CMS Editais e Atas

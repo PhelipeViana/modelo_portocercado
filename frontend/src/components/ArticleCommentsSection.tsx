@@ -2,115 +2,127 @@ import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, 
   Send, 
-  Crown, 
-  Lock, 
-  Sparkles, 
   Check, 
   Heart, 
   UserCheck, 
   LogOut, 
-  CreditCard, 
-  QrCode, 
-  ShieldCheck, 
   Clock, 
-  Star,
-  AlertCircle
+  ShieldCheck,
+  Reply,
+  MessageSquarePlus,
+  X,
+  CornerDownRight
 } from 'lucide-react';
 import { ArticleComment, CommentUser } from '../types';
 import { INITIAL_COMMENTS } from '../data/newsData';
+import { registerSubscriberApi, fetchArticleComments, postArticleComment } from '../services/api';
 
 interface ArticleCommentsSectionProps {
   articleSlug: string;
+  articleId?: string | number;
 }
 
-export const ArticleCommentsSection: React.FC<ArticleCommentsSectionProps> = ({ articleSlug }) => {
-  // 1. Comments list state (persisted per article in localStorage)
+export const ArticleCommentsSection: React.FC<ArticleCommentsSectionProps> = ({ articleSlug, articleId }) => {
   const [comments, setComments] = useState<ArticleComment[]>([]);
-  
-  // 2. User authentication and Premium status (persisted globally in localStorage)
   const [user, setUser] = useState<CommentUser | null>(null);
 
-  // 3. Form input states
   const [loginName, setLoginName] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
   
-  // 4. Modal / Flow states
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [subscriptionProcessing, setSubscriptionProcessing] = useState(false);
-  const [subscriptionSuccessMessage, setSubscriptionSuccessMessage] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix');
+  const [replyTarget, setReplyTarget] = useState<{ id: string | number; authorName: string; parentId: string | number } | null>(null);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [submitNotice, setSubmitNotice] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load user session on mount and listen to updates
+  // Load local subscriber session on mount
   useEffect(() => {
-    const loadSession = () => {
-      const savedUser = localStorage.getItem('pc_comment_user');
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-    loadSession();
-
-    window.addEventListener('pc_user_updated', loadSession);
-    return () => window.removeEventListener('pc_user_updated', loadSession);
-  }, []);
-
-  // Load and merge comments for this article on mount and when articleSlug changes
-  useEffect(() => {
-    const storageKey = `pc_comments_${articleSlug}`;
-    const savedLocalComments = localStorage.getItem(storageKey);
-    let localList: ArticleComment[] = [];
-
-    if (savedLocalComments) {
+    const savedUser = localStorage.getItem('pc_comment_user');
+    if (savedUser) {
       try {
-        localList = JSON.parse(savedLocalComments);
+        setUser(JSON.parse(savedUser));
       } catch (e) {
         console.error(e);
       }
     }
+  }, []);
 
-    // Filter relevant initial mock comments for this article
-    const defaultList = INITIAL_COMMENTS.filter(
-      (c) => c.articleSlug === articleSlug || c.articleSlug === 'comunidade-ribeirinha-e-rancheiros-porto-cercado'
-    );
+  const loadCommentsList = () => {
+    const numId = Number(articleId);
+    if (!isNaN(numId) && numId > 0) {
+      fetchArticleComments(numId).then((backendComments) => {
+        if (backendComments && Array.isArray(backendComments)) {
+          const mapped: ArticleComment[] = backendComments.map((c: any) => ({
+            id: String(c.id),
+            parentId: c.parentId ? String(c.parentId) : undefined,
+            parentAuthorName: c.parentAuthorName,
+            articleSlug,
+            authorName: c.authorName,
+            authorEmail: c.authorEmail,
+            authorRole: 'Assinante Ativo',
+            isPremium: true,
+            content: c.content,
+            createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR') : 'Recente',
+            likes: 0,
+          }));
+          setComments(mapped);
+          return;
+        }
+        loadFallbackComments();
+      });
+    } else {
+      loadFallbackComments();
+    }
 
-    // Combine local user comments with mock initial comments
-    const combined = [...localList, ...defaultList.filter((d) => !localList.some((l) => l.id === d.id))];
-    setComments(combined);
-  }, [articleSlug]);
+    function loadFallbackComments() {
+      const storageKey = `pc_comments_${articleSlug}`;
+      const savedLocalComments = localStorage.getItem(storageKey);
+      let localList: ArticleComment[] = [];
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+      if (savedLocalComments) {
+        try {
+          localList = JSON.parse(savedLocalComments);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const defaultList = INITIAL_COMMENTS.filter(
+        (c: any) => c.articleSlug === articleSlug || c.articleSlug === 'comunidade-ribeirinha-e-rancheiros-porto-cercado'
+      );
+
+      const combined = [...localList, ...defaultList.filter((d: any) => !localList.some((l) => l.id === d.id))];
+      setComments(combined);
+    }
+  };
+
+  useEffect(() => {
+    loadCommentsList();
+  }, [articleSlug, articleId]);
+
+  // Handle Subscriber Registration / Login in Modal
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginName.trim() || !loginEmail.trim()) return;
 
-    // Check if user was previously saved with premium
-    const savedUserStr = localStorage.getItem('pc_comment_user');
-    let isPrevPremium = false;
-    if (savedUserStr) {
-      try {
-        const parsed = JSON.parse(savedUserStr);
-        if (parsed.email === loginEmail.trim() && parsed.isPremium) {
-          isPrevPremium = true;
-        }
-      } catch (err) {}
+    setIsSubmitting(true);
+    const res = await registerSubscriberApi(loginName.trim(), loginEmail.trim().toLowerCase());
+    setIsSubmitting(false);
+
+    if (res && res.error) {
+      alert(res.error);
+      return;
     }
 
     const newUser: CommentUser = {
-      name: loginName.trim(),
-      email: loginEmail.trim().toLowerCase(),
-      isPremium: isPrevPremium,
+      name: res.name || loginName.trim(),
+      email: res.email || loginEmail.trim().toLowerCase(),
+      isPremium: true,
       memberSince: new Date().toLocaleDateString('pt-BR')
     };
 
     setUser(newUser);
     localStorage.setItem('pc_comment_user', JSON.stringify(newUser));
-    setShowLoginModal(false);
   };
 
   // Handle Logout
@@ -119,65 +131,76 @@ export const ArticleCommentsSection: React.FC<ArticleCommentsSectionProps> = ({ 
     localStorage.removeItem('pc_comment_user');
   };
 
-  // Handle Subscription Simulation (R$ 9,99 / mês)
-  const handleSubscribePremium = () => {
-    if (!user) return;
-    setSubscriptionProcessing(true);
+  // Open Comment Modal for a new root comment
+  const handleOpenCommentModal = () => {
+    setReplyTarget(null);
+    setNewCommentText('');
+    setShowCommentModal(true);
+  };
 
-    setTimeout(() => {
-      const updatedUser: CommentUser = {
-        ...user,
-        isPremium: true
-      };
-      setUser(updatedUser);
-      localStorage.setItem('pc_comment_user', JSON.stringify(updatedUser));
-      setSubscriptionProcessing(false);
-      setSubscriptionSuccessMessage(true);
-
-      setTimeout(() => {
-        setSubscriptionSuccessMessage(false);
-        setShowSubscriptionModal(false);
-      }, 1500);
-    }, 1000);
+  // Reply to Comment (sets parent/reply target)
+  const handleReplyTo = (comment: ArticleComment) => {
+    const parentId = comment.parentId || comment.id;
+    setReplyTarget({
+      id: comment.id,
+      authorName: comment.authorName,
+      parentId
+    });
+    setNewCommentText(`@${comment.authorName} `);
+    setShowCommentModal(true);
   };
 
   // Handle Comment Submission
-  const handleSubmitComment = (e: React.FormEvent) => {
+  const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.isPremium || !newCommentText.trim()) return;
+    if (!user || !newCommentText.trim()) return;
 
-    const newComment: ArticleComment = {
-      id: `comment-${Date.now()}`,
-      articleSlug,
-      authorName: user.name,
-      authorEmail: user.email,
-      authorRole: 'Membro Premium Pantanal',
-      isPremium: true,
-      content: newCommentText.trim(),
-      createdAt: 'Agora mesmo',
-      likes: 0
-    };
+    setIsSubmitting(true);
+    const numId = Number(articleId);
+    const parentNumId = replyTarget ? Number(replyTarget.parentId) : undefined;
+    let success = true;
 
-    const updated = [newComment, ...comments];
-    setComments(updated);
+    if (!isNaN(numId) && numId > 0) {
+      success = await postArticleComment(numId, user.name, user.email, newCommentText.trim(), parentNumId);
+    }
 
-    // Save user's own comments in localStorage
-    const storageKey = `pc_comments_${articleSlug}`;
-    const userCreated = updated.filter((c) => c.authorEmail === user.email);
-    localStorage.setItem(storageKey, JSON.stringify(userCreated));
+    setIsSubmitting(false);
 
-    setNewCommentText('');
+    if (success) {
+      const newComment: ArticleComment = {
+        id: `comment-${Date.now()}`,
+        parentId: replyTarget ? replyTarget.parentId : undefined,
+        parentAuthorName: replyTarget ? replyTarget.authorName : undefined,
+        articleSlug,
+        authorName: user.name,
+        authorEmail: user.email,
+        authorRole: 'Assinante Ativo',
+        isPremium: true,
+        content: newCommentText.trim(),
+        createdAt: 'Agora mesmo',
+        likes: 0
+      };
+
+      setComments((prev) => [...prev, newComment]);
+      setSubmitNotice('Seu comentário foi publicado com sucesso!');
+      setNewCommentText('');
+      setReplyTarget(null);
+      setShowCommentModal(false);
+      setTimeout(() => setSubmitNotice(''), 4000);
+      loadCommentsList();
+    } else {
+      alert('Não foi possível publicar seu comentário. Verifique se sua assinatura está ativa.');
+    }
   };
 
-  // Handle Like on Comment
-  const handleLikeComment = (commentId: string) => {
+  const handleLikeComment = (commentId: string | number) => {
     setComments((prev) =>
       prev.map((c) => {
         if (c.id === commentId) {
           const isLiked = c.likedByMe;
           return {
             ...c,
-            likes: isLiked ? c.likes - 1 : c.likes + 1,
+            likes: (c.likes || 0) + (isLiked ? -1 : 1),
             likedByMe: !isLiked
           };
         }
@@ -186,453 +209,349 @@ export const ArticleCommentsSection: React.FC<ArticleCommentsSectionProps> = ({ 
     );
   };
 
+  // Organize root comments and child replies
+  const rootComments = comments.filter((c) => !c.parentId);
+  const getReplies = (parentId: string | number) =>
+    comments.filter((c) => String(c.parentId) === String(parentId));
+
   return (
-    <section className="w-full mt-14 pt-10 border-t border-slate-200 dark:border-slate-800">
+    <section id="comments-section" className="w-full mt-10 pt-8 border-t border-slate-200 dark:border-slate-800">
       
-      {/* 1. Header of Comments Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      {/* 1. Header with Prominent Action Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-6 bg-emerald-600 rounded-full"></span>
-            <h3 className="font-sans text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-              <span>Voz Comunitária • Comentários</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold">
-                {comments.length}
-              </span>
-            </h3>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Espaço aberto para leitura pública de toda a comunidade. Para comentar, autentique-se como Membro Premium.
+          <h3 className="font-sans text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
+            <span>Comentários</span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 font-bold">
+              {comments.length}
+            </span>
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Espaço aberto de opinião e participação dos assinantes do portal.
           </p>
         </div>
 
-        {/* User Status Bar */}
-        {user ? (
-          <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/80 p-2 sm:px-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs">
-            <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="leading-tight">
-              <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[130px]">
-                {user.name}
-              </span>
-              {user.isPremium ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-500 dark:text-amber-400">
-                  <Crown className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span>Premium Ativo</span>
-                </span>
-              ) : (
-                <button
-                  onClick={() => setShowSubscriptionModal(true)}
-                  className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 underline cursor-pointer"
-                >
-                  Ativar Premium
-                </button>
-              )}
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-1.5 text-slate-400 hover:text-red-500 transition-colors ml-1 cursor-pointer"
-              title="Sair da Conta"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer border border-slate-200 dark:border-slate-700 flex items-center gap-2 shadow-2xs"
-          >
-            <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Fazer Login</span>
-          </button>
-        )}
-      </div>
-
-      {/* 2. Interactive Writing Box or Lock Warning */}
-      <div className="mb-10">
-        {!user ? (
-          /* Case A: Not Logged In */
-          <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-slate-50 to-slate-100 dark:from-slate-900/90 dark:via-slate-900 dark:to-slate-800/80 border border-emerald-200/80 dark:border-slate-800 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600/10 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
-              <Lock className="w-6 h-6" />
-            </div>
-            <div className="max-w-md mx-auto">
-              <h4 className="font-bold text-slate-900 dark:text-white text-base">
-                Deseja Comentar nesta Notícia?
-              </h4>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
-                A leitura dos comentários é 100% livre. Para publicar uma manifestação, faça login com seu nome e e-mail. Para comentar é necessário ser <strong>Usuário Premium</strong> (R$ 9,99/mês).
-              </p>
-            </div>
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer"
-            >
-              Entrar com Nome e E-mail
-            </button>
-          </div>
-        ) : !user.isPremium ? (
-          /* Case B: Logged in, but NOT Premium */
-          <div className="p-6 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/80 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-300 dark:border-amber-700">
-                  <Crown className="w-5 h-5 fill-amber-500 text-amber-500" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                    Olá, {user.name}! Torne-se Membro Premium para Comentar
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    O acesso para comentar exige assinatura de <strong>R$ 9,99 por mês</strong> que apoia os ribeirinhos de Porto Cercado.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowSubscriptionModal(true)}
-                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer whitespace-nowrap"
-              >
-                Ativar Premium (R$ 9,99/mês)
-              </button>
-            </div>
-
-            <div className="text-xs text-amber-800 dark:text-amber-300/90 pl-1 border-t border-amber-200 dark:border-amber-800/50 pt-3 flex flex-wrap items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-600" /> Selo Membro Premium ⭐
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-600" /> Publicação liberada em todo o portal
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-600" /> Apoio ao fundo de defeso dos pescadores
-              </span>
-            </div>
-          </div>
-        ) : (
-          /* Case C: Logged in AND Premium */
-          <form onSubmit={handleSubmitComment} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 shadow-sm space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 dark:text-white">{user.name}</span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 font-bold text-[10px] flex items-center gap-1 border border-amber-300 dark:border-amber-700">
-                  <Crown className="w-3 h-3 fill-amber-500 text-amber-500" />
-                  <span>Membro Premium ⭐</span>
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400">
-                {500 - newCommentText.length} caracteres
-              </span>
-            </div>
-
-            <textarea
-              rows={3}
-              maxLength={500}
-              value={newCommentText}
-              onChange={(e) => setNewCommentText(e.target.value)}
-              placeholder="Escreva seu comentário ou consideração sobre esta notícia para a comunidade pantaneira..."
-              className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 resize-none"
-            />
-
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-[11px] text-slate-400">
-                Comentários passam por mediação comunitária para manter o respeito mútuo.
-              </p>
-              <button
-                type="submit"
-                disabled={!newCommentText.trim()}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Publicar Comentário</span>
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-
-      {/* 3. Render Comments List (Free for reading by everyone) */}
-      <div className="space-y-4">
-        {comments.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 dark:text-slate-500 text-xs">
-            Nenhum comentário publicado nesta notícia ainda. Seja o primeiro a comentar!
-          </div>
-        ) : (
-          comments.map((comment) => (
-            <div 
-              key={comment.id}
-              className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2.5 transition-colors"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-emerald-700 text-emerald-100 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                    {comment.authorName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
-                        {comment.authorName}
-                      </span>
-                      {comment.isPremium && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold text-[10px] flex items-center gap-1 border border-amber-200 dark:border-amber-800">
-                          <Crown className="w-3 h-3 fill-amber-400 text-amber-500" />
-                          <span>Membro Premium</span>
-                        </span>
-                      )}
-                    </div>
-                    {comment.authorRole && (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                        {comment.authorRole}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                  <Clock className="w-3 h-3" />
-                  <span>{comment.createdAt}</span>
-                </div>
-              </div>
-
-              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed pl-1 sm:pl-11">
-                {comment.content}
-              </p>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 pl-1 sm:pl-11 text-xs">
-                <button
-                  onClick={() => handleLikeComment(comment.id)}
-                  className={`flex items-center gap-1.5 transition-colors cursor-pointer font-semibold ${
-                    comment.likedByMe
-                      ? 'text-rose-600 dark:text-rose-400 font-bold'
-                      : 'text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400'
-                  }`}
-                >
-                  <Heart className={`w-3.5 h-3.5 ${comment.likedByMe ? 'fill-rose-500 text-rose-500' : ''}`} />
-                  <span>{comment.likes > 0 ? comment.likes : 'Curtir'}</span>
-                </button>
-
-                <span className="text-[11px] text-slate-400">
-                  Comunidade Porto Cercado
-                </span>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* 4. Modal: Login (Nome & Email) */}
-      {showLoginModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowLoginModal(false);
-          }}
+        {/* Prominent Button "Fazer Comentário" */}
+        <button
+          onClick={handleOpenCommentModal}
+          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md hover:shadow-emerald-600/20 cursor-pointer transition-all hover:scale-105 active:scale-95 shrink-0"
         >
-          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-emerald-100 dark:border-slate-800 p-6">
-            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1 font-sans">
-              Identificação para Comentários
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-              Informe seu nome completo e e-mail para autenticar seu perfil no portal da Associação dos Ribeirinhos.
-            </p>
+          <MessageSquarePlus className="w-4 h-4" />
+          <span>Fazer Comentário</span>
+        </button>
+      </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  Seu Nome Completo:
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={loginName}
-                  onChange={(e) => setLoginName(e.target.value)}
-                  placeholder="Ex: Carlos Eduardo de Oliveira"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  Seu E-mail:
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="Ex: carlos@email.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
-                <span>
-                  Para habilitar o envio de comentários, é necessária a assinatura <strong>Usuário Premium por R$ 9,99/mês</strong>.
-                </span>
-              </div>
-
-              <div className="flex gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md"
-                >
-                  Entrar
-                </button>
-              </div>
-            </form>
-          </div>
+      {/* Notice Toast */}
+      {submitNotice && (
+        <div className="mb-6 p-3.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{submitNotice}</span>
         </div>
       )}
 
-      {/* 5. Modal: Premium Subscription Simulation (R$ 9,99/mês) */}
-      {showSubscriptionModal && (
+      {/* 2. Threaded Comments List (PAI e FILHO) */}
+      <div className="space-y-6">
+        {comments.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs space-y-3">
+            <p>Nenhum comentário publicado nesta notícia ainda.</p>
+            <button
+              onClick={handleOpenCommentModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+            >
+              <MessageSquarePlus className="w-3.5 h-3.5" />
+              <span>Seja o primeiro a comentar</span>
+            </button>
+          </div>
+        ) : (
+          rootComments.map((parent) => {
+            const replies = getReplies(parent.id);
+
+            return (
+              <div key={parent.id} className="space-y-3">
+                {/* --- COMENTÁRIO PAI --- */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2.5 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-emerald-700 text-emerald-100 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                        {parent.authorName.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                            {parent.authorName}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-200 dark:border-emerald-800">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>Assinante Ativo</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span>{parent.createdAt}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed pl-1 sm:pl-11">
+                    {parent.content}
+                  </p>
+
+                  <div className="flex items-center gap-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 pl-1 sm:pl-11 text-xs">
+                    <button
+                      onClick={() => handleLikeComment(parent.id)}
+                      className={`flex items-center gap-1.5 transition-colors cursor-pointer font-semibold ${
+                        parent.likedByMe
+                          ? 'text-rose-600 dark:text-rose-400 font-bold'
+                          : 'text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400'
+                      }`}
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${parent.likedByMe ? 'fill-rose-500 text-rose-500' : ''}`} />
+                      <span>{(parent.likes || 0) > 0 ? parent.likes : 'Curtir'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleReplyTo(parent)}
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 font-semibold transition-colors cursor-pointer"
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Responder</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* --- RESPOSTAS FILHOS (SUB-THREAD) --- */}
+                {replies.length > 0 && (
+                  <div className="ml-4 sm:ml-8 pl-3 sm:pl-5 border-l-2 border-emerald-500/40 dark:border-emerald-600/50 space-y-3 pt-1">
+                    {replies.map((child) => (
+                      <div 
+                        key={child.id}
+                        className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5 transition-colors shadow-2xs"
+                      >
+                        {/* Tag indicando resposta ao PAI */}
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                          <CornerDownRight className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Em resposta a <strong className="text-slate-900 dark:text-white">{child.parentAuthorName || parent.authorName}</strong></span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-emerald-800 text-emerald-100 flex items-center justify-center font-bold text-[11px] shrink-0">
+                              {child.authorName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900 dark:text-white">
+                                {child.authorName}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-[9px] flex items-center gap-1">
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Assinante</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                            <Clock className="w-3 h-3" />
+                            <span>{child.createdAt}</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed pl-9">
+                          {child.content}
+                        </p>
+
+                        <div className="flex items-center gap-4 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 pl-9 text-xs">
+                          <button
+                            onClick={() => handleLikeComment(child.id)}
+                            className={`flex items-center gap-1.5 transition-colors cursor-pointer font-semibold ${
+                              child.likedByMe
+                                ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                : 'text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400'
+                            }`}
+                          >
+                            <Heart className={`w-3 h-3 ${child.likedByMe ? 'fill-rose-500 text-rose-500' : ''}`} />
+                            <span>{(child.likes || 0) > 0 ? child.likes : 'Curtir'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleReplyTo(child)}
+                            className="flex items-center gap-1.5 text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 font-semibold transition-colors cursor-pointer"
+                          >
+                            <Reply className="w-3 h-3" />
+                            <span>Responder</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 3. Modal Completo: Cadastro / Login & Redação de Comentário */}
+      {showCommentModal && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !subscriptionProcessing) setShowSubscriptionModal(false);
+            if (e.target === e.currentTarget) setShowCommentModal(false);
           }}
         >
-          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-amber-200 dark:border-amber-900/60 overflow-hidden">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-emerald-100 dark:border-slate-800 p-6 sm:p-7">
             
-            {/* Header */}
-            <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 text-white p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Crown className="w-5 h-5 fill-white" />
-                <span className="text-xs font-black uppercase tracking-wider">
-                  Assinatura Comunitária
-                </span>
-              </div>
-              <h3 className="text-2xl font-black font-sans leading-tight">
-                Membro Premium Pantanal
-              </h3>
-              <p className="text-amber-100 text-xs mt-1">
-                Comente em todas as notícias e apoie diretamente as famílias ribeirinhas de Porto Cercado.
-              </p>
-            </div>
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCommentModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            <div className="p-6 space-y-5">
-              
-              {/* Pricing Box */}
-              <div className="flex items-baseline justify-between p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+            {!user ? (
+              /* ESTADO 1: NÃO CADASTRADO / NÃO LOGADO */
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+
                 <div>
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-300 block">
-                    Plano Mensal de Comentarista
-                  </span>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Acesso completo a comentários e debates
-                  </span>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white font-sans">
+                    Identificação de Assinante
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    A leitura é pública. Para publicar comentários diretamente no portal, informe seu Nome e E-mail como assinante ativo.
+                  </p>
                 </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                    R$ 9,99
-                  </span>
-                  <span className="text-xs text-slate-500"> / mês</span>
-                </div>
+
+                <form onSubmit={handleLogin} className="space-y-3.5 pt-2">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Seu Nome Completo:
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={loginName}
+                      onChange={(e) => setLoginName(e.target.value)}
+                      placeholder="Ex: Carlos Eduardo"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Seu E-mail:
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="Ex: carlos@email.com"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex gap-2.5 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowCommentModal(false)}
+                      className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer shadow-md disabled:opacity-50"
+                    >
+                      {isSubmitting ? 'Verificando...' : 'Avançar para Comentar'}
+                    </button>
+                  </div>
+                </form>
               </div>
-
-              {/* Benefits */}
-              <div className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Publicação de comentários autorizada em todas as notícias</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Badge exclusivo <strong>Membro Premium ⭐</strong></span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Contribuição direta para o fundo comunitário dos pescadores</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Cancelamento fácil a qualquer momento</span>
-                </div>
-              </div>
-
-              {/* Payment Method Selector */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
-                  Método de Pagamento Simulado:
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('pix')}
-                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                      paymentMethod === 'pix'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    <QrCode className="w-4 h-4" />
-                    <span>PIX Instantâneo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                      paymentMethod === 'card'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Cartão de Crédito</span>
-                  </button>
-                </div>
-              </div>
-
-              {subscriptionSuccessMessage ? (
-                <div className="p-4 rounded-xl bg-emerald-500 text-white font-bold text-center text-xs flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" />
-                  <span>Assinatura Premium ativada com sucesso!</span>
-                </div>
-              ) : (
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowSubscriptionModal(false)}
-                    className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSubscribePremium}
-                    disabled={subscriptionProcessing}
-                    className="flex-2 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer transform active:scale-95"
-                  >
-                    {subscriptionProcessing ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-3.5 h-3.5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin"></span>
-                        <span>Processando Simulação...</span>
+            ) : (
+              /* ESTADO 2: CADASTRADO / LOGADO -> FORMULÁRIO DE COMENTÁRIO */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 dark:text-white text-xs block">
+                        {user.name}
                       </span>
-                    ) : (
-                      <>
-                        <Crown className="w-4 h-4 fill-amber-950" />
-                        <span>Confirmar Assinatura (R$ 9,99)</span>
-                      </>
-                    )}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                        <span>Assinante Ativo</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Trocar de Conta"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>Sair</span>
                   </button>
                 </div>
-              )}
 
-              <p className="text-center text-[11px] text-slate-400">
-                Simulação de assinatura: Nenhuma cobrança real será efetuada no seu cartão ou banco.
-              </p>
-            </div>
+                {/* Banner de Reposta (se for resposta a um comentário existente) */}
+                {replyTarget && (
+                  <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <CornerDownRight className="w-4 h-4 text-emerald-600" />
+                      <span>Respondendo a: <strong>{replyTarget.authorName}</strong></span>
+                    </span>
+                    <button 
+                      onClick={() => setReplyTarget(null)}
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline text-[11px] font-bold cursor-pointer"
+                    >
+                      Cancelar resposta
+                    </button>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white font-sans">
+                    {replyTarget ? `Responder a ${replyTarget.authorName}` : 'Publicar Comentário'}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {replyTarget ? 'Sua resposta será anexada diretamente a este comentário.' : 'Escreva sua opinião ou contribuição abaixo.'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmitComment} className="space-y-3">
+                  <textarea
+                    rows={4}
+                    maxLength={500}
+                    autoFocus
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                    placeholder={replyTarget ? `Digite sua resposta para ${replyTarget.authorName}...` : "Escreva seu comentário sobre esta notícia..."}
+                    className="w-full text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                  />
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>{500 - newCommentText.length} caracteres restantes</span>
+                    <button
+                      type="submit"
+                      disabled={!newCommentText.trim() || isSubmitting}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSubmitting ? 'Publicando...' : replyTarget ? 'Enviar Resposta' : 'Publicar Comentário'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
           </div>
         </div>
@@ -641,3 +560,4 @@ export const ArticleCommentsSection: React.FC<ArticleCommentsSectionProps> = ({ 
     </section>
   );
 };
+

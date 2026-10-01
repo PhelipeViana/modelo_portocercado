@@ -34,6 +34,8 @@ func RunMigrations(db *gorm.DB) error {
 		{Version: "20260929_06_video_episodes", Execute: MigrateVideoEpisodes},
 		{Version: "20260930_01_article_status", Execute: MigrateArticleStatus},
 		{Version: "20260930_02_article_video_url", Execute: MigrateArticleVideoURL},
+		{Version: "20260930_03_comment_and_metrics", Execute: MigrateCommentsAndMetrics},
+		{Version: "20260930_04_subscribers", Execute: MigrateSubscribers},
 	}
 
 	appliedCount := 0

@@ -17,6 +17,8 @@ import { ARTICLES_DATA } from '../data/newsData';
 import { ArticleCommentsSection } from '../components/ArticleCommentsSection';
 import { sanitizeRichText } from '../utils/sanitizeRichText';
 
+import { incrementArticleView, incrementArticleShare, fetchRelatedArticles } from '../services/api';
+
 interface NoticiaViewProps {
   article: Article;
   onNavigateHome: () => void;
@@ -33,24 +35,39 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
   const [fontScale, setFontScale] = useState<'sm' | 'md' | 'lg'>('md');
   const [copied, setCopied] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    const numId = Number(article.id);
+    if (!isNaN(numId) && numId > 0) {
+      incrementArticleView(numId);
+    }
+    fetchRelatedArticles(article.slug).then((list) => {
+      if (list && list.length > 0) {
+        setRelatedArticles(list);
+      } else {
+        setRelatedArticles(ARTICLES_DATA.filter((a) => a.id !== article.id).slice(0, 3));
+      }
+    });
   }, [article.slug, article.id]);
 
   const handleCopyLink = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       setCopied(true);
+      const numId = Number(article.id);
+      if (!isNaN(numId) && numId > 0) incrementArticleShare(numId);
       setTimeout(() => setCopied(false), 2500);
     }
   };
 
   const handleShareWhatsApp = () => {
+    const numId = Number(article.id);
+    if (!isNaN(numId) && numId > 0) incrementArticleShare(numId);
     const text = encodeURIComponent(`*${article.title}*\n\nLeia mais no portal da Associação Porto Cercado: ${window.location.href}`);
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
-
   const handlePrint = () => {
     window.print();
   };
@@ -62,9 +79,6 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
     : 'text-lg leading-relaxed';
 
   const youtubeId = article.videoUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/)?.[1];
-
-  // 3 Related articles excluding current
-  const relatedArticles = ARTICLES_DATA.filter((a) => a.id !== article.id).slice(0, 3);
 
   return (
     <article className="w-full pb-16 pt-4 animate-in fade-in duration-300">
@@ -97,17 +111,30 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
           </button>
         </div>
 
-        {/* 2. Metadata */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            <span>Publicado: {article.date}</span>
+        {/* 2. Metadata & View Metrics */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+              <span>Publicado: {article.date}</span>
+            </div>
+            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+              <span>{article.readTime}</span>
+            </div>
           </div>
-          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
-            <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            <span>{article.readTime}</span>
-          </div>
+
+          <button
+            onClick={() => {
+              const el = document.getElementById('comments-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 transition-all cursor-pointer"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Ver Comentários / Opiniões</span>
+          </button>
         </div>
 
         {/* 3. Headline (H1) */}
@@ -239,32 +266,8 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
           ))}
         </div>
 
-        {/* 8. Institutional Footer / Seal Box */}
-        <div className="mt-12 p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-600/10 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-800">
-              <FileText className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block">
-                Assessoria de Imprensa e Comunicação Oficial
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Associação dos Ribeirinhos e Rancheiros do Porto Cercado • Poconé/MT
-              </span>
-            </div>
-          </div>
-
-          <button
-            onClick={onNavigateHome}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-xs whitespace-nowrap"
-          >
-            Mais Notícias do Portal
-          </button>
-        </div>
-
-        {/* 9. Comments Section: Free to read, requires login & Premium (R$ 9,99/mo) to comment */}
-        <ArticleCommentsSection articleSlug={article.slug} />
+        {/* 9. Comments Section */}
+        <ArticleCommentsSection articleSlug={article.slug} articleId={article.id} />
 
         {/* 10. Related Articles ("Leia Também") */}
         <div className="mt-14 pt-10 border-t border-slate-200 dark:border-slate-800">

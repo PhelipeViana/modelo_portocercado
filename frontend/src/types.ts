@@ -30,6 +30,8 @@ export interface Article {
   readTime: string;
   featured?: boolean;
   shares?: number;
+  viewCount?: number;
+  publishedAt?: string;
   videoUrl?: string;
 }
 
@@ -109,14 +111,34 @@ export interface CommentUser {
 }
 
 export interface ArticleComment {
-  id: string;
-  articleSlug: string;
+  id: string | number;
+  parentId?: string | number;
+  parentAuthorName?: string;
+  articleId?: number;
+  articleSlug?: string;
+  articleTitle?: string;
   authorName: string;
   authorEmail: string;
   authorRole?: string;
-  isPremium: boolean;
+  isPremium?: boolean;
   content: string;
+  status?: 'approved' | 'pending' | 'rejected';
   createdAt: string;
-  likes: number;
+  likes?: number;
   likedByMe?: boolean;
+}
+
+export interface MediaFile {
+  name: string;
+  url: string;
+  size: number;
+  updatedAt: string;
+}
+
+export interface Subscriber {
+  id: number;
+  name: string;
+  email: string;
+  ativo: boolean;
+  createdAt?: string;
 }

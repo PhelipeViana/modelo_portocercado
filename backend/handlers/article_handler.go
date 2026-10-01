@@ -181,3 +181,69 @@ func DeleteArticleHandler(cfg *config.Config, cache *services.CacheService) fibe
 		return c.JSON(fiber.Map{"message": "Notícia removida com sucesso"})
 	}
 }
+
+func IncrementArticleViewHandler(cfg *config.Config, cache *services.CacheService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		idParam := c.Params("id")
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
+		}
+		if cfg.DB == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Banco de dados indisponível"})
+		}
+		if err := cfg.DB.Model(&models.Article{}).Where("id = ?", uint(id)).UpdateColumn("view_count", gorm.Expr("view_count + 1")).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Erro ao incrementar visualizações"})
+		}
+		return c.JSON(fiber.Map{"message": "Visualização registrada"})
+	}
+}
+
+func IncrementArticleShareHandler(cfg *config.Config, cache *services.CacheService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		idParam := c.Params("id")
+		id, err := strconv.ParseUint(idParam, 10, 32)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
+		}
+		if cfg.DB == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Banco de dados indisponível"})
+		}
+		if err := cfg.DB.Model(&models.Article{}).Where("id = ?", uint(id)).UpdateColumn("shares", gorm.Expr("shares + 1")).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Erro ao incrementar compartilhamentos"})
+		}
+		return c.JSON(fiber.Map{"message": "Compartilhamento registrado"})
+	}
+}
+
+func GetRelatedArticlesHandler(cfg *config.Config, cache *services.CacheService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		if cfg.DB == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Banco de dados indisponível"})
+		}
+		var current models.Article
+		if err := cfg.DB.Where("slug = ?", slug).First(&current).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Notícia não encontrada"})
+		}
+
+		var related []models.Article
+		if err := cfg.DB.Where("slug <> ? AND category = ? AND status = ?", slug, current.Category, "published").Order("id DESC").Limit(3).Find(&related).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Erro ao buscar notícias relacionadas"})
+		}
+
+		if len(related) < 3 {
+			var fallback []models.Article
+			excludeSlugs := []string{slug}
+			for _, r := range related {
+				excludeSlugs = append(excludeSlugs, r.Slug)
+			}
+			limit := 3 - len(related)
+			cfg.DB.Where("slug NOT IN ? AND status = ?", excludeSlugs, "published").Order("id DESC").Limit(limit).Find(&fallback)
+			related = append(related, fallback...)
+		}
+
+		return c.JSON(related)
+	}
+}
+

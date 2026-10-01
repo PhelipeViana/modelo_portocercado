@@ -423,6 +423,8 @@ export const INITIAL_COMMENTS: ArticleComment[] = [
   },
   {
     id: 'cmt-2',
+    parentId: 'cmt-1',
+    parentAuthorName: 'Seu Benedito da Silva',
     articleSlug: 'comunidade-ribeirinha-e-rancheiros-porto-cercado',
     authorName: 'Marcos Vinicius Rancheiro',
     authorEmail: 'marcos.pesqueiro@gmail.com',
@@ -431,6 +433,19 @@ export const INITIAL_COMMENTS: ArticleComment[] = [
     content: 'Como proprietário de rancho aqui há mais de 15 anos, apoio 100% essa união. O respeito com os pescadores locais e com a preservação do Rio Cuiabá tem que vir em primeiro lugar.',
     createdAt: 'Hoje às 11:40',
     likes: 5
+  },
+  {
+    id: 'cmt-1-2',
+    parentId: 'cmt-1',
+    parentAuthorName: 'Seu Benedito da Silva',
+    articleSlug: 'comunidade-ribeirinha-e-rancheiros-porto-cercado',
+    authorName: 'Carlos Eduardo',
+    authorEmail: 'carlos@email.com',
+    authorRole: 'Assinante Ativo',
+    isPremium: true,
+    content: 'Falou tudo, Seu Benedito! A presença ativa da associação traz mais transparência e valor para toda a nossa comunidade.',
+    createdAt: 'Hoje às 14:10',
+    likes: 3
   },
   {
     id: 'cmt-3',

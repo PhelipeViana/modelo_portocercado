@@ -4,59 +4,50 @@ import "porto-cercado-backend/models"
 
 var Articles = []models.Article{
 	{
-		ID:            "art-1",
+		ID:            1,
 		Slug:          "pesca-esportiva-sustentavel-porto-cercado",
 		Title:         "Guia da Pesca Esportiva Sustentável em Porto Cercado",
 		Subtitle:      "Boas práticas para a conservação das espécies no Pantanal Mato-Grossense",
 		Summary:       "Descubra as principais normas de pesque-e-solte, épocas de defeso e como preservar a fauna aquática de Porto Cercado.",
-		Content:       []string{
-			"Porto Cercado é um dos principais polos de turismo ecológico e pesca esportiva do Pantanal. Com a biodiversidade exuberante da região, a prática consciente da pesca é fundamental.",
-			"Neste guia completo, abordamos as melhores técnicas para garantir o bem-estar do peixe após a captura, equipamentos recomendados e a legislação ambiental vigente.",
-			"Respeitar as cotas e periódos de defeso garante que as futuras gerações continuem desfrutando das riquezas de nossas águas.",
-		},
+		Content:       "<p>Porto Cercado é um dos principais polos de turismo ecológico e pesca esportiva do Pantanal. Com a biodiversidade exuberante da região, a prática consciente da pesca é fundamental.</p><p>Neste guia completo, abordamos as melhores técnicas para garantir o bem-estar do peixe após a captura, equipamentos recomendados e a legislação ambiental vigente.</p><p>Respeitar as cotas e períodos de defeso garante que as futuras gerações continuem desfrutando das riquezas de nossas águas.</p>",
 		Category:      "Turismo & Pesca",
 		CategoryColor: "emerald",
 		Tag:           "Sustentabilidade",
 		ImageURL:      "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80",
-		Author: models.Author{
-			Name:     "Conselho de Meio Ambiente",
-			Role:     "Comissão de Sustentabilidade",
-			Initials: "CMA",
-		},
-		Date:     "28 de Setembro, 2026",
-		ReadTime: "5 min de leitura",
-		Featured: true,
-		Shares:   142,
+		AuthorName:    "Conselho de Meio Ambiente",
+		AuthorRole:    "Comissão de Sustentabilidade",
+		AuthorInit:    "CMA",
+		Date:          "28 de Setembro, 2026",
+		ReadTime:      "5 min de leitura",
+		Featured:      true,
+		Status:        "published",
+		Shares:        142,
 	},
 	{
-		ID:            "art-2",
+		ID:            2,
 		Slug:          "melhorias-infraestrutura-acesso-marina",
 		Title:         "Obras de Infraestrutura no Acesso à Marina e Porto",
 		Subtitle:      "Pavimentação e sinalização para o acesso seguro dos associados e visitantes",
 		Summary:       "Confira os detalhes das melhorias viárias aprovadas para a região do Porto Cercado.",
-		Content:       []string{
-			"A diretoria comunica o início das obras de melhoria na via principal de acesso ao porto.",
-			"O projeto inclui nova pavimentação, sinalização noturna e pontos de apoio náutico.",
-		},
+		Content:       "<p>A diretoria comunica o início das obras de melhoria na via principal de acesso ao porto.</p><p>O projeto inclui nova pavimentação, sinalização noturna e pontos de apoio náutico.</p>",
 		Category:      "Infraestrutura",
 		CategoryColor: "amber",
 		Tag:           "Obras",
 		ImageURL:      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80",
-		Author: models.Author{
-			Name:     "Diretoria de Obras",
-			Role:     "Gestão 2025/2027",
-			Initials: "DO",
-		},
-		Date:     "25 de Setembro, 2026",
-		ReadTime: "4 min de leitura",
-		Featured: false,
-		Shares:   89,
+		AuthorName:    "Diretoria de Obras",
+		AuthorRole:    "Gestão 2025/2027",
+		AuthorInit:    "DO",
+		Date:          "25 de Setembro, 2026",
+		ReadTime:      "4 min de leitura",
+		Featured:      false,
+		Status:        "published",
+		Shares:        89,
 	},
 }
 
 var Documents = []models.OfficialDocument{
 	{
-		ID:          "doc-1",
+		ID:          1,
 		Title:       "Edital de Convocação - Assembleia Geral Ordinária 2026",
 		Code:        "ED-2026/04",
 		Type:        "Edital",
@@ -67,7 +58,7 @@ var Documents = []models.OfficialDocument{
 		DownloadURL: "#",
 	},
 	{
-		ID:          "doc-2",
+		ID:          2,
 		Title:       "Ata da Reunião de Diretoria - Setembro 2026",
 		Code:        "ATA-2026/09",
 		Type:        "Ata",
@@ -81,7 +72,7 @@ var Documents = []models.OfficialDocument{
 
 var Events = []models.CalendarEvent{
 	{
-		ID:          "evt-1",
+		ID:          1,
 		Title:       "Torneio Anual de Pesca Esportiva Porto Cercado",
 		Day:         "15",
 		Month:       "OUT",
@@ -94,7 +85,7 @@ var Events = []models.CalendarEvent{
 		Registered:  false,
 	},
 	{
-		ID:          "evt-2",
+		ID:          2,
 		Title:       "Assembleia Geral Ordinária de Associados",
 		Day:         "22",
 		Month:       "OUT",
@@ -110,7 +101,7 @@ var Events = []models.CalendarEvent{
 
 var Videos = []models.VideoEpisode{
 	{
-		ID:            "vid-1",
+		ID:            1,
 		Title:         "Documentário: As Cores e Aves de Porto Cercado",
 		Category:      "Documentário",
 		CategoryColor: "cyan",
