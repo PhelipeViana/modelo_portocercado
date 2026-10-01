@@ -15,12 +15,14 @@ import (
 )
 
 type Config struct {
-	Port              string
-	DB                *gorm.DB
-	RedisClient       *redis.Client
-	JWTSecret         string
-	OpenRouterAPIKey  string
-	OpenRouterModel   string
+	Port                 string
+	DB                   *gorm.DB
+	RedisClient          *redis.Client
+	JWTSecret            string
+	OpenRouterAPIKey     string
+	OpenRouterModel      string
+	OpenRouterImageModel string
+	UploadsDir           string
 }
 
 func getEnv(key, defaultValue string) string {
@@ -40,6 +42,11 @@ func InitConfig() (*Config, error) {
 	jwtSecret := getEnv("JWT_SECRET", "portocercado2_super_secret_key_2026")
 	openRouterKey := getEnv("OPENROUTER_API_KEY", "")
 	openRouterModel := getEnv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+	openRouterImageModel := getEnv("OPENROUTER_IMAGE_MODEL", "openai/gpt-image-1")
+	uploadsDir := getEnv("UPLOADS_DIR", "./storage/uploads")
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		return nil, fmt.Errorf("não foi possível criar o diretório de uploads: %w", err)
+	}
 
 	// PostgreSQL Config (referências portocercado2)
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -86,11 +93,13 @@ func InitConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Port:             port,
-		DB:               db,
-		RedisClient:      rdb,
-		JWTSecret:        jwtSecret,
-		OpenRouterAPIKey: openRouterKey,
-		OpenRouterModel:  openRouterModel,
+		Port:                 port,
+		DB:                   db,
+		RedisClient:          rdb,
+		JWTSecret:            jwtSecret,
+		OpenRouterAPIKey:     openRouterKey,
+		OpenRouterModel:      openRouterModel,
+		OpenRouterImageModel: openRouterImageModel,
+		UploadsDir:           uploadsDir,
 	}, nil
 }

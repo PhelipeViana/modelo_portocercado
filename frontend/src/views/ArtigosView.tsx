@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { Search, BookOpen, Clock, ArrowRight } from 'lucide-react';
 import { Article } from '../types';
-import { ARTICLES_DATA } from '../data/newsData';
 
 interface ArtigosViewProps {
+  articles: Article[];
   onSelectArticle: (article: Article) => void;
 }
 
-export const ArtigosView: React.FC<ArtigosViewProps> = ({ onSelectArticle }) => {
+export const ArtigosView: React.FC<ArtigosViewProps> = ({ articles, onSelectArticle }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Sem categorização: busca geral direta
-  const filtered = ARTICLES_DATA.filter((art) => {
+  const filtered = articles.filter((art) => {
     const matchesSearch = art.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           art.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           art.author.name.toLowerCase().includes(searchTerm.toLowerCase());

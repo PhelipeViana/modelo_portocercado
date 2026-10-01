@@ -29,6 +29,7 @@ func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Porto Cercado Go API (Fiber + Redis + Postgres)",
 		ServerHeader: "Fiber",
+		BodyLimit:    12 * 1024 * 1024,
 	})
 
 	// 4. Middlewares Globais
@@ -41,6 +42,7 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
+	app.Static("/uploads", cfg.UploadsDir)
 
 	// 5. Grupo de Rotas da API
 	api := app.Group("/api")
@@ -67,6 +69,9 @@ func main() {
 
 	// CMS Site Settings Update (Com invalidação de cache Redis)
 	admin.Put("/site/info", handlers.UpdateSiteInfoHandler(cfg, cache))
+	admin.Get("/admin/articles", handlers.GetAdminArticlesHandler(cfg))
+	admin.Post("/ai/image", handlers.GenerateArticleImageHandler(cfg))
+	admin.Post("/uploads/images", handlers.UploadImageHandler(cfg))
 
 	// Gerenciamento de Usuários e Nível de Acesso
 	admin.Get("/users", handlers.GetUsersHandler(cfg, cache))

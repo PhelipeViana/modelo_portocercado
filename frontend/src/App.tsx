@@ -23,10 +23,14 @@ import { EditUserModal } from './components/EditUserModal';
 
 import { Article, PhotoAlbum, VideoEpisode, OfficialDocument, ScreenTab } from './types';
 import { ARTICLES_DATA, VIDEOS_DATA, PHOTO_ALBUMS, getArticleBySlug } from './data/newsData';
+import { fetchArticles } from './services/api';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<ScreenTab>('inicio');
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
+  const [articles, setArticles] = useState<Article[]>(ARTICLES_DATA);
+
+  useEffect(() => { fetchArticles().then((rows) => { if (rows.length) setArticles(rows); }); }, []);
   const [isAdminRoute, setIsAdminRoute] = useState(() => {
     if (typeof window === 'undefined') return false;
     const hash = window.location.hash.replace(/^#\/?/, '');
@@ -84,7 +88,7 @@ export default function App() {
       if (rawHash.startsWith('noticia/')) {
         const noticiaSlug = rawHash.replace('noticia/', '').split('?')[0];
         if (noticiaSlug) {
-          const found = getArticleBySlug(noticiaSlug);
+          const found = articles.find((article) => article.slug === noticiaSlug) || getArticleBySlug(noticiaSlug);
           if (found) {
             setActiveArticle(found);
             setCurrentTab('noticia');
@@ -124,7 +128,7 @@ export default function App() {
       window.removeEventListener('popstate', handleRouteEvent);
       window.removeEventListener('hashchange', handleRouteEvent);
     };
-  }, []);
+  }, [articles]);
 
   const handleSelectArticle = (article: Article) => {
     setActiveArticle(article);
@@ -233,8 +237,8 @@ export default function App() {
       {/* 2. Breaking News Ticker Bar */}
       <TickerBar
         onSelectHeadline={(headline) => {
-          const matched = ARTICLES_DATA.find((a) => a.title.includes(headline.slice(0, 20)));
-          handleSelectArticle(matched || ARTICLES_DATA[0]);
+          const matched = articles.find((a) => a.title.includes(headline.slice(0, 20)));
+          if (matched) handleSelectArticle(matched);
         }}
       />
 
@@ -242,6 +246,7 @@ export default function App() {
       <div className="flex-1">
         {currentTab === 'inicio' && (
           <HomeView
+            articles={articles}
             onSelectArticle={handleSelectArticle}
             onSelectVideo={handleOpenVideoById}
             onOpenAlbum={(album) => setActiveAlbum(album)}
@@ -253,7 +258,7 @@ export default function App() {
 
         {currentTab === 'noticia' && (
           <NoticiaView
-            article={activeArticle || ARTICLES_DATA[0]}
+            article={activeArticle || articles[0] || ARTICLES_DATA[0]}
             onNavigateHome={handleNavigateHome}
             onSelectArticle={handleSelectArticle}
             onNavigateTab={handleSelectTab}
@@ -284,6 +289,7 @@ export default function App() {
 
         {currentTab === 'artigos-e-opiniao' && (
           <ArtigosView
+            articles={articles}
             onSelectArticle={handleSelectArticle}
           />
         )}

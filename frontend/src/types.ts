@@ -30,6 +30,7 @@ export interface Article {
   readTime: string;
   featured?: boolean;
   shares?: number;
+  videoUrl?: string;
 }
 
 export interface VideoEpisode {

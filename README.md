@@ -59,7 +59,7 @@ docker compose down
 
 ```bash
 cd backend
-go run main.go
+go run ./cmd/server
 ```
 
 A API estará rodando internamente ou via `http://localhost:8088`.
@@ -86,3 +86,34 @@ A interface estará rodando em `http://localhost:3000`.
 | `GET` | `/api/events` | Retorna a agenda de eventos |
 | `GET` | `/api/videos` | Retorna a lista de vídeos e episódios |
 | `POST` | `/api/ai/chat` | Endpoint para interação com o Atendente IA |
+
+## Notícias e backup dos dados
+
+O painel administrativo grava notícias e rascunhos no PostgreSQL. As rotas públicas `/api/articles` e `/api/articles/:slug` expõem somente notícias publicadas; o endpoint administrativo `GET /api/admin/articles` requer JWT e retorna também rascunhos. O CRUD administrativo usa `POST`, `PUT` e `DELETE /api/articles[/:id]`.
+
+O serviço `database-backup` gera automaticamente dumps compactados diariamente em `./backups` e mantém 14 dias. Configure `BACKUP_INTERVAL_SECONDS` e `BACKUP_RETENTION_DAYS` no `.env` para ajustar o ciclo e a retenção. Verifique os arquivos com:
+
+```bash
+docker compose logs database-backup
+ls -lh backups/
+```
+
+Para gerar um backup manual:
+
+```bash
+docker compose exec database-backup sh /usr/local/bin/database-backup.sh once
+```
+
+Para importar um arquivo `.sql.gz` no banco:
+
+```bash
+gunzip -c backups/ARQUIVO.sql.gz | docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+O diretório `backups/` fica fora do volume do banco e não é versionado. Mantenha uma cópia fora da máquina para recuperação contra falha do host.
+
+## Imagens e vídeos nas notícias
+
+No editor de notícias, selecione **Enviar e recortar imagem** para gerar uma capa 16:9 e salvar o arquivo no storage do sistema. No Docker, os arquivos ficam no volume `portocercado2_uploads`; eles continuam disponíveis após recriar o container. Em execução local, o padrão é `backend/storage/uploads` e pode ser alterado com `UPLOADS_DIR`.
+
+Para uma notícia em vídeo, informe a URL do YouTube. O sistema detecta links `youtu.be`, `watch`, `shorts` e `embed`, preenche a capa a partir do YouTube e mostra o player na página pública da notícia.

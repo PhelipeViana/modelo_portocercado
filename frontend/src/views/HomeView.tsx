@@ -4,9 +4,9 @@ import { NewsFeedSection } from '../components/NewsFeedSection';
 import { SidebarWidgets } from '../components/SidebarWidgets';
 import { PhotoGalleryStrip } from '../components/PhotoGalleryStrip';
 import { Article, PhotoAlbum, ScreenTab } from '../types';
-import { ARTICLES_DATA } from '../data/newsData';
 
 interface HomeViewProps {
+  articles: Article[];
   onSelectArticle: (article: Article) => void;
   onSelectVideo: (videoId?: string) => void;
   onOpenAlbum: (album: PhotoAlbum) => void;
@@ -16,6 +16,7 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
+  articles,
   onSelectArticle,
   onOpenAlbum,
   onNavigateTab,
@@ -26,7 +27,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     <main className="w-full flex flex-col">
       {/* 1. Destaque Principal Único (sem categorias) */}
       <HeroBento
-        articles={ARTICLES_DATA}
+        articles={articles}
         onSelectArticle={onSelectArticle}
       />
 
@@ -37,7 +38,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {/* Main 8-col News Feed */}
           <div className="min-w-0 lg:col-span-8">
             <NewsFeedSection
-              articles={ARTICLES_DATA}
+              articles={articles}
               onSelectArticle={onSelectArticle}
               onShareArticle={onShareArticle}
             />

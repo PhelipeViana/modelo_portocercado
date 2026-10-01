@@ -11,7 +11,9 @@ RUN go mod download
 COPY . .
 
 # Compila o executável estático
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server ./cmd/server \
+    && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o migrate ./cmd/migrate \
+    && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o seed ./cmd/seed
 
 # Estágio de execução (Runtime leve)
 FROM alpine:3.20
@@ -22,6 +24,8 @@ WORKDIR /root/
 
 # Copia o binário compilado do estágio anterior
 COPY --from=builder /app/server .
+COPY --from=builder /app/migrate .
+COPY --from=builder /app/seed .
 
 EXPOSE 8080
 

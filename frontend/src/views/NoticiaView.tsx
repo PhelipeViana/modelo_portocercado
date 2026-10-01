@@ -15,6 +15,7 @@ import {
 import { Article, ScreenTab } from '../types';
 import { ARTICLES_DATA } from '../data/newsData';
 import { ArticleCommentsSection } from '../components/ArticleCommentsSection';
+import { sanitizeRichText } from '../utils/sanitizeRichText';
 
 interface NoticiaViewProps {
   article: Article;
@@ -59,6 +60,8 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
     : fontScale === 'lg' 
     ? 'text-xl leading-relaxed font-normal' 
     : 'text-lg leading-relaxed';
+
+  const youtubeId = article.videoUrl?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/)?.[1];
 
   // 3 Related articles excluding current
   const relatedArticles = ARTICLES_DATA.filter((a) => a.id !== article.id).slice(0, 3);
@@ -219,22 +222,20 @@ export const NoticiaView: React.FC<NoticiaViewProps> = ({
 
         {/* 6. Lead Image with Caption */}
         <div className="rounded-2xl overflow-hidden shadow-md aspect-video sm:aspect-21/9 bg-slate-100 dark:bg-slate-800 relative mb-8 border border-slate-200 dark:border-slate-800">
-          <img 
-            src={article.imageUrl} 
-            alt={article.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-md text-white text-[11px] font-medium px-3 py-1 rounded-lg">
-            Foto: Acervo Associação dos Ribeirinhos do Porto Cercado
-          </div>
+          {youtubeId ? (
+            <iframe className="h-full w-full" src={`https://www.youtube-nocookie.com/embed/${youtubeId}`} title={article.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+          ) : (
+            <>
+              <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover" />
+              <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-md text-white text-[11px] font-medium px-3 py-1 rounded-lg">Foto: Acervo Associação dos Ribeirinhos do Porto Cercado</div>
+            </>
+          )}
         </div>
 
         {/* 7. Article Body Paragraphs */}
         <div className={`space-y-6 text-slate-800 dark:text-slate-100 ${fontSizeClass}`}>
           {article.content.map((paragraph, index) => (
-            <p key={index} className="leading-relaxed font-normal text-slate-700 dark:text-slate-200">
-              {paragraph}
-            </p>
+            <div key={index} className="rich-text-content leading-relaxed font-normal text-slate-700 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: sanitizeRichText(paragraph) }} />
           ))}
         </div>
 

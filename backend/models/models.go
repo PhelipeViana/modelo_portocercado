@@ -73,12 +73,14 @@ type Article struct {
 	CategoryColor string         `gorm:"type:varchar(100)" json:"categoryColor"`
 	Tag           string         `gorm:"type:varchar(100)" json:"tag,omitempty"`
 	ImageURL      string         `gorm:"type:varchar(255)" json:"imageUrl"`
+	VideoURL      string         `gorm:"type:varchar(255)" json:"videoUrl,omitempty"`
 	AuthorName    string         `gorm:"type:varchar(255)" json:"authorName"`
 	AuthorRole    string         `gorm:"type:varchar(255)" json:"authorRole"`
 	AuthorInit    string         `gorm:"type:varchar(10)" json:"authorInit"`
 	Date          string         `gorm:"type:varchar(100)" json:"date"`
 	ReadTime      string         `gorm:"type:varchar(50)" json:"readTime"`
 	Featured      bool           `gorm:"default:false" json:"featured"`
+	Status        string         `gorm:"type:varchar(20);not null;default:'published';index" json:"status"`
 	Shares        int            `gorm:"default:0" json:"shares"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
@@ -172,6 +174,21 @@ type AIChatRequest struct {
 }
 
 type AIChatResponse struct {
-	Reply     string `json:"reply"`
-	Timestamp string `json:"timestamp"`
+	Reply     string         `json:"reply"`
+	Timestamp string         `json:"timestamp"`
+	Title     string         `json:"title,omitempty"`
+	Summary   string         `json:"summary,omitempty"`
+	Content   string         `json:"content,omitempty"`
+	Provider  string         `json:"provider"`
+	Sources   []AINewsSource `json:"sources,omitempty"`
+}
+
+type AIImageRequest struct {
+	Prompt string `json:"prompt"`
+}
+
+type AINewsSource struct {
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	PublishedAt string `json:"publishedAt,omitempty"`
 }

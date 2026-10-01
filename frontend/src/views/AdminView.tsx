@@ -37,12 +37,19 @@ import {
   fetchUsers,
   createUser,
   deleteUser,
-  fetchArticles,
+  fetchManagedArticles,
+  saveManagedArticle,
+  removeManagedArticle,
+  uploadArticleImage,
+  generateArticleImage,
   sendAIChat,
+  AIResearchSource,
   SiteInfoData,
   UserAccount
 } from '../services/api';
 import { Article } from '../types';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { ImageCropDialog } from '../components/ImageCropDialog';
 
 type ArticleStatus = 'Publicado' | 'Rascunho' | 'Agendado';
 
@@ -54,14 +61,13 @@ interface ManagedArticle {
   updatedAt: string;
   status: ArticleStatus;
   summary?: string;
+  slug: string;
+  content: string;
+  imageUrl: string;
+  videoUrl: string;
+  featured: boolean;
+  statusCode: 'published' | 'draft';
 }
-
-const INITIAL_ARTICLES: ManagedArticle[] = [
-  { id: 1, title: 'Comunidade ribeirinha se une pela preservação do Rio Cuiabá', category: 'Meio Ambiente', author: 'Comunicação Ribeirinha', updatedAt: 'Hoje, 09:30', status: 'Publicado' },
-  { id: 2, title: 'A união dos pescadores na conservação das espécies nativas', category: 'Comunidade', author: 'Benedito da Silva', updatedAt: 'Hoje, 08:00', status: 'Publicado' },
-  { id: 3, title: 'Agenda de manutenção das pontes de acesso para outubro', category: 'Infraestrutura', author: 'Comissão de Acesso', updatedAt: 'Ontem, 16:20', status: 'Rascunho' },
-  { id: 4, title: 'Convocação para Assembleia Geral da Associação', category: 'Institucional', author: 'Diretoria', updatedAt: '28 set, 11:40', status: 'Agendado' },
-];
 
 const statusStyles: Record<ArticleStatus, string> = {
   Publicado: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-950/60 dark:text-emerald-300',
@@ -90,16 +96,26 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Content State
-  const [articles, setArticles] = useState<ManagedArticle[]>(INITIAL_ARTICLES);
+  const [articles, setArticles] = useState<ManagedArticle[]>([]);
   const [activeSection, setActiveSection] = useState('Visão geral');
   const [search, setSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [isAiOpen, setIsAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [aiSources, setAiSources] = useState<AIResearchSource[]>([]);
+  const [aiProvider, setAiProvider] = useState('');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftSummary, setDraftSummary] = useState('');
+  const [draftContent, setDraftContent] = useState('');
+  const [draftImageUrl, setDraftImageUrl] = useState('');
+  const [draftVideoUrl, setDraftVideoUrl] = useState('');
+  const [draftFeatured, setDraftFeatured] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [isSavingArticle, setIsSavingArticle] = useState(false);
   const [notice, setNotice] = useState('');
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
@@ -164,19 +180,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
   };
 
   const loadBackendArticles = async () => {
-    const data = await fetchArticles();
-    if (data && data.length > 0) {
-      const mapped: ManagedArticle[] = data.map((art, idx) => ({
-        id: Number(art.id) || idx + 10,
-        title: art.title,
-        category: art.category || 'Geral',
-        author: art.author?.name || 'Administração',
-        updatedAt: art.date || 'Recente',
-        status: art.featured ? 'Publicado' : 'Publicado',
-        summary: art.summary,
-      }));
-      setArticles(mapped);
-    }
+    if (!token) return;
+    const data = await fetchManagedArticles(token);
+    setArticles(data.map((art) => ({
+      id: art.id, title: art.title, category: art.category || 'Geral', author: art.authorName || 'Administração',
+      updatedAt: art.updatedAt ? new Date(art.updatedAt).toLocaleString('pt-BR') : art.date || 'Recente',
+      status: art.status === 'draft' ? 'Rascunho' : 'Publicado', summary: art.summary, slug: art.slug,
+      content: art.content || '', imageUrl: art.imageUrl || '', statusCode: art.status,
+      videoUrl: art.videoUrl || '',
+      featured: art.featured,
+    })));
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -267,8 +280,16 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   const openNewArticle = () => {
+    setEditingId(null);
     setDraftTitle('');
     setDraftSummary('');
+    setDraftContent('');
+    setDraftImageUrl('');
+    setDraftVideoUrl('');
+    setDraftFeatured(false);
+    setAiSources([]);
+    setAiProvider('');
+    setAiPrompt('');
     setIsEditorOpen(true);
   };
 
@@ -278,32 +299,104 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
 
     try {
       const response = await sendAIChat(`Escreva um rascunho de notícia sobre: ${topic}`);
-      setDraftTitle(`Comunidade debate ${topic.charAt(0).toLocaleUpperCase('pt-BR') + topic.slice(1)}`);
-      setDraftSummary(response.reply || `Rascunho produzido com IA para informar os associados sobre ${topic}.`);
+      setDraftTitle(response.title || `Comunidade debate ${topic.charAt(0).toLocaleUpperCase('pt-BR') + topic.slice(1)}`);
+      setDraftSummary(response.summary || response.reply || `Rascunho produzido com IA para informar os associados sobre ${topic}.`);
+      setDraftContent(response.content || `<p>${response.reply}</p>`);
+      setAiSources(response.sources || []);
+      setAiProvider(response.provider || 'IA');
     } catch {
       setDraftTitle(`Comunidade debate ${topic.charAt(0).toLocaleUpperCase('pt-BR') + topic.slice(1)}`);
       setDraftSummary(`Rascunho inicial produzido para informar os associados sobre ${topic}. Revise os dados e publique.`);
+      setDraftContent(`<p>Rascunho inicial produzido para informar os associados sobre ${topic}. Revise os dados antes de publicar.</p>`);
+      setAiSources([]);
+      setAiProvider('Modo local');
     }
 
     setIsGenerating(false);
-    setIsAiOpen(false);
-    setIsEditorOpen(true);
-    setNotice('Rascunho criado com IA. Revise antes de publicar.');
+    setNotice('Rascunho criado. Revise as fontes antes de publicar.');
   };
 
-  const saveDraft = (status: ArticleStatus) => {
-    const title = draftTitle.trim() || 'Nova publicação sem título';
-    setArticles((current) => [{
-      id: Date.now(),
-      title,
-      category: 'Comunidade',
-      author: currentUser?.name || 'Administração',
-      updatedAt: 'Agora',
-      status,
-      summary: draftSummary,
-    }, ...current]);
+  const generateImage = async () => {
+    if (!token) return;
+    const subject = [draftTitle, draftSummary, aiPrompt].filter(Boolean).join('. ');
+    if (!subject) { setNotice('Informe uma pauta ou gere o texto antes de criar a imagem.'); return; }
+    setIsGeneratingImage(true);
+    const imageUrl = await generateArticleImage(subject, token);
+    if (!imageUrl) { setIsGeneratingImage(false); setNotice('Não foi possível gerar a imagem. Verifique a configuração do modelo de imagem no OpenRouter.'); return; }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Falha ao carregar a imagem gerada'));
+        image.src = imageUrl;
+      });
+    } catch {
+      setIsGeneratingImage(false);
+      setNotice('A imagem foi criada, mas não pôde ser carregada na prévia. Tente gerar novamente.');
+      return;
+    }
+    setDraftVideoUrl('');
+    setDraftImageUrl(imageUrl);
+    setIsGeneratingImage(false);
+    setNotice('Imagem de capa criada com IA.');
+  };
+
+  const saveDraft = async (status: ArticleStatus) => {
+    if (!token) return;
+    const title = draftTitle.trim();
+    if (!title) { setNotice('Informe o título da notícia.'); return; }
+    const slug = (editingId ? articles.find((article) => article.id === editingId)?.slug : '') || title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    setIsSavingArticle(true);
+    const saved = await saveManagedArticle({
+      ...(editingId ? { id: editingId } : {}), slug, title, summary: draftSummary.trim(), content: draftContent.trim(),
+      category: 'Comunidade', categoryColor: 'emerald', imageUrl: draftImageUrl.trim(), videoUrl: draftVideoUrl.trim(), authorName: currentUser?.name || 'Administração',
+      authorRole: 'Comunicação', authorInit: (currentUser?.name || 'PC').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
+      date: new Date().toLocaleDateString('pt-BR'), readTime: '3 min', featured: status === 'Publicado' && draftFeatured, status: status === 'Publicado' ? 'published' : 'draft',
+    }, token);
+    setIsSavingArticle(false);
+    if (!saved) { setNotice('Não foi possível salvar. Verifique a conexão com a API e se o título já está em uso.'); return; }
     setIsEditorOpen(false);
     setNotice(status === 'Publicado' ? 'Notícia publicada com sucesso.' : 'Rascunho salvo com sucesso.');
+    await loadBackendArticles();
+  };
+
+  const editArticle = (article: ManagedArticle) => {
+    setEditingId(article.id); setDraftTitle(article.title); setDraftSummary(article.summary || '');
+    setDraftContent(article.content || ''); setDraftImageUrl(article.imageUrl || ''); setDraftVideoUrl(article.videoUrl || ''); setDraftFeatured(article.featured); setIsEditorOpen(true);
+  };
+
+  const getYouTubeId = (url: string) => {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);
+    return match?.[1] || '';
+  };
+
+  const handleVideoUrlChange = (url: string) => {
+    setDraftVideoUrl(url);
+    const videoId = getYouTubeId(url);
+    if (videoId) setDraftImageUrl(`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`);
+  };
+
+  const handleImageFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setNotice('Selecione um arquivo de imagem válido.'); return; }
+    setImageToCrop(file);
+  };
+
+  const uploadCroppedImage = async (image: Blob) => {
+    if (!token) return;
+    setIsUploadingImage(true);
+    const url = await uploadArticleImage(image, token);
+    setIsUploadingImage(false);
+    setImageToCrop(null);
+    if (!url) { setNotice('Não foi possível enviar a imagem.'); return; }
+    setDraftVideoUrl('');
+    setDraftImageUrl(url);
+  };
+
+  const deleteArticle = async (id: number) => {
+    if (!token || !confirm('Deseja realmente excluir esta notícia?')) return;
+    if (await removeManagedArticle(id, token)) { setNotice('Notícia excluída.'); await loadBackendArticles(); }
+    else setNotice('Não foi possível excluir a notícia.');
   };
 
   const navigation = [
@@ -761,13 +854,6 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => setIsAiOpen(true)}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-bold text-emerald-800 transition-all hover:bg-emerald-50 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-                  >
-                    <Sparkles className="h-4 w-4" /> Gerar com IA
-                  </button>
-                  <button
-                    type="button"
                     onClick={openNewArticle}
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all hover:bg-emerald-500 hover:shadow-emerald-600/30 active:scale-[.98]"
                   >
@@ -837,18 +923,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
                       </span>
                       <button
                         type="button"
-                        onClick={() => { setDraftTitle(article.title); setDraftSummary(article.summary || ''); setIsEditorOpen(true); }}
+                        onClick={() => editArticle(article)}
                         className="w-fit text-xs font-bold text-emerald-700 hover:text-emerald-600 dark:text-emerald-400 cursor-pointer"
                       >
                         Editar
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`Mais ações para ${article.title}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      >
-                        <MoreHorizontal className="h-5 w-5" />
-                      </button>
+                      <button type="button" aria-label={`Excluir ${article.title}`} onClick={() => deleteArticle(article.id)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50"><Trash2 className="h-4 w-4" /></button>
                     </article>
                   ))}
                   {filteredArticles.length === 0 && (
@@ -866,61 +946,32 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
         </div>
       </main>
 
-      {/* MODAL 1: AI GENERATOR MODAL */}
-      {isAiOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
-          <div className="w-full rounded-t-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:max-w-lg sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                  <Bot className="h-5 w-5" />
-                </span>
-                <div>
-                  <h3 id="ai-modal-title" className="font-black">Criar rascunho com IA (Fiber API)</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                    Informe o assunto. O conteúdo gerado deve ser revisado antes da publicação.
-                  </p>
-                </div>
-              </div>
-              <button type="button" aria-label="Fechar" onClick={() => setIsAiOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <label className="mt-6 block text-sm font-bold">
-              Sobre o que você quer escrever?
-              <textarea
-                value={aiPrompt}
-                onChange={(event) => setAiPrompt(event.target.value)}
-                placeholder="Ex.: Mutirão de limpeza nas margens do Rio Cuiabá"
-                className="mt-2 min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={isGenerating}
-              onClick={generateDraft}
-              className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
-            >
-              <Sparkles className="h-4 w-4" />
-              {isGenerating ? 'Gerando rascunho...' : 'Gerar conteúdo'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: EDITOR MODAL */}
+      {/* MODAL: EDITOR */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-[60] flex items-end bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title">
           <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:max-w-2xl sm:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">Editor</p>
-                <h3 id="editor-modal-title" className="mt-1 text-xl font-black">Nova notícia</h3>
+                <h3 id="editor-modal-title" className="mt-1 text-xl font-black">{editingId ? 'Editar notícia' : 'Nova notícia'}</h3>
               </div>
               <button type="button" aria-label="Fechar" onClick={() => setIsEditorOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
+            {!editingId && (
+              <section className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white"><Bot className="h-4 w-4" /></span>
+                  <div>
+                    <h4 className="text-sm font-black text-emerald-950 dark:text-emerald-100">Criar com pesquisa assistida</h4>
+                    <p className="mt-0.5 text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">A IA pesquisa pautas relevantes do Mato Grosso, Pantanal e pesca antes de preencher a notícia.</p>
+                  </div>
+                </div>
+                <textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Ex.: Impactos da seca no Pantanal para pescadores de Porto Cercado" className="mt-3 min-h-24 w-full resize-none rounded-xl border border-emerald-200 bg-white p-3 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-emerald-900 dark:bg-slate-950" />
+                <button type="button" disabled={isGenerating} onClick={generateDraft} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"><Sparkles className="h-4 w-4" />{isGenerating ? 'Pesquisando e redigindo...' : 'Gerar texto com IA'}</button>
+              </section>
+            )}
             <label className="mt-6 block text-sm font-bold">
               Título
               <input
@@ -929,6 +980,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
                 placeholder="Digite o título da notícia"
                 className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950"
               />
+            </label>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+              <input type="checkbox" checked={draftFeatured} onChange={(event) => setDraftFeatured(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-500" />
+              <span>
+                <span className="block font-black text-amber-900 dark:text-amber-200">Manter esta notícia em destaque</span>
+                <span className="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-300">Ela aparecerá primeiro no portal. Ao salvar, o destaque anterior será removido automaticamente.</span>
+              </span>
             </label>
             <label className="mt-4 block text-sm font-bold">
               Resumo
@@ -939,19 +997,93 @@ export const AdminView: React.FC<AdminViewProps> = ({ darkMode, onToggleDarkMode
                 className="mt-2 min-h-32 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
+            <label className="mt-4 block text-sm font-bold">
+              Vídeo do YouTube (opcional)
+              <input
+                type="url"
+                value={draftVideoUrl}
+                onChange={(event) => handleVideoUrlChange(event.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950"
+              />
+              <span className="mt-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Ao informar um vídeo válido, a capa é carregada automaticamente do YouTube.</span>
+            </label>
+            <div className="mt-4">
+              <p className="text-sm font-bold">Imagem de capa</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <button type="button" disabled={isGeneratingImage} onClick={generateImage} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white hover:bg-violet-500 disabled:cursor-wait disabled:opacity-70"><Sparkles className="h-4 w-4" />{isGeneratingImage ? 'Criando imagem...' : 'Gerar imagem com IA'}</button>
+                <label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  {isUploadingImage ? 'Enviando imagem...' : 'Enviar e recortar imagem'}
+                  <input type="file" accept="image/jpeg,image/png" className="sr-only" disabled={isUploadingImage} onChange={(event) => handleImageFile(event.target.files?.[0])} />
+                </label>
+                <input
+                  type="url"
+                  value={draftImageUrl}
+                  onChange={(event) => { setDraftImageUrl(event.target.value); setDraftVideoUrl(''); }}
+                  placeholder="Ou cole uma URL de imagem"
+                  className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </div>
+              <span className="mt-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Arquivos enviados ficam armazenados de forma persistente no servidor.</span>
+            </div>
+            {isGeneratingImage && (
+              <div className="relative mt-3 flex aspect-video w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-violet-300 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/30">
+                <div className="absolute inset-0 animate-pulse bg-linear-to-r from-transparent via-violet-200/50 to-transparent dark:via-violet-800/30" />
+                <Sparkles className="relative h-7 w-7 animate-pulse text-violet-600 dark:text-violet-300" />
+                <p className="relative mt-3 text-sm font-black text-violet-900 dark:text-violet-100">Criando e carregando a imagem de capa...</p>
+                <p className="relative mt-1 text-xs font-medium text-violet-700 dark:text-violet-300">A prévia aparecerá assim que a imagem estiver pronta.</p>
+              </div>
+            )}
+            {!isGeneratingImage && !draftImageUrl && (
+              <div className="mt-3 flex aspect-video w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950">
+                <Sparkles className="h-7 w-7 text-violet-500" />
+                <p className="mt-3 text-sm font-black text-slate-700 dark:text-slate-200">Prévia da imagem de capa</p>
+                <p className="mt-1 max-w-xs text-xs font-medium text-slate-500 dark:text-slate-400">Gere uma imagem com IA, envie um arquivo ou informe uma URL para visualizá-la aqui.</p>
+              </div>
+            )}
+            {draftImageUrl && (
+              <img
+                src={draftImageUrl}
+                alt="Prévia da capa da notícia"
+                className="mt-3 aspect-video w-full rounded-xl border border-slate-200 object-cover dark:border-slate-700"
+                onError={(event) => { event.currentTarget.style.display = 'none'; }}
+              />
+            )}
+            <div className="mt-4">
+              <p className="text-sm font-bold">Conteúdo da notícia</p>
+              <RichTextEditor value={draftContent} onChange={setDraftContent} placeholder="Escreva o conteúdo completo da notícia..." />
+            </div>
+            {aiSources.length > 0 && (
+              <section className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+                <p className="text-sm font-black text-sky-900 dark:text-sky-200">Pesquisa usada pela {aiProvider || 'IA'}</p>
+                <p className="mt-1 text-xs text-sky-800 dark:text-sky-300">Confirme as informações nas fontes antes de publicar a notícia.</p>
+                <ul className="mt-3 space-y-2">
+                  {aiSources.map((source) => (
+                    <li key={source.url} className="text-xs">
+                      <a href={source.url} target="_blank" rel="noreferrer" className="font-bold text-sky-800 underline hover:text-sky-600 dark:text-sky-300">{source.title}</a>
+                      {source.publishedAt && <span className="ml-2 text-sky-700 dark:text-sky-400">{source.publishedAt}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => setIsEditorOpen(false)} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                 Cancelar
               </button>
-              <button type="button" onClick={() => saveDraft('Rascunho')} className="min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40">
+              <button type="button" disabled={isSavingArticle} onClick={() => saveDraft('Rascunho')} className="min-h-11 rounded-xl border border-emerald-200 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40">
                 Salvar rascunho
               </button>
-              <button type="button" onClick={() => saveDraft('Publicado')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-500">
+              <button type="button" disabled={isSavingArticle} onClick={() => saveDraft('Publicado')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-500">
                 <Send className="h-4 w-4" />Publicar
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {imageToCrop && (
+        <ImageCropDialog file={imageToCrop} onCancel={() => setImageToCrop(null)} onComplete={uploadCroppedImage} />
       )}
 
       {/* MODAL 3: CREATE USER MODAL */}

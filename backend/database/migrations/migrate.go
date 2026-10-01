@@ -32,6 +32,8 @@ func RunMigrations(db *gorm.DB) error {
 		{Version: "20260929_04_official_documents", Execute: MigrateOfficialDocuments},
 		{Version: "20260929_05_calendar_events", Execute: MigrateCalendarEvents},
 		{Version: "20260929_06_video_episodes", Execute: MigrateVideoEpisodes},
+		{Version: "20260930_01_article_status", Execute: MigrateArticleStatus},
+		{Version: "20260930_02_article_video_url", Execute: MigrateArticleVideoURL},
 	}
 
 	appliedCount := 0
